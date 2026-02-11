@@ -49,18 +49,30 @@ API_HASH = os.getenv("API_HASH", "")
 EMPLOYEES_CONFIG = {
     12313213131321: { 
         "clients": {
-            "#Test": 12312213131321 
+            "#Test": {
+                "client_id": 12312213131321,
+                "group_chat_id": None  # None = использовать TARGET_CHAT_ID
+            }
         } 
     },
     610220736: { 
         "clients": { 
-            "#Durov": "@durov",
-            "#VIP_Chat": 610220736  # ID клиента (человека)
+            "#Durov": {
+                "client_id": "@durov",
+                "group_chat_id": None  # Укажите ID группового чата для этого клиента
+            },
+            "#VIP_Chat": {
+                "client_id": 610220736,
+                "group_chat_id": None  # Укажите ID группового чата
+            }
         } 
     },
     645070075: { 
         "clients": { 
-            "#Moscow": 7948650630
+            "#Moscow": {
+                "client_id": 7948650630,
+                "group_chat_id": VIP_GROUP_ID  # Используем существующий VIP чат
+            }
         } 
     }
 }
@@ -179,9 +191,28 @@ class EmployeeState(StatesGroup):
 # ==========================================
 
 def get_user_clients(user_id):
+    """Возвращает словарь клиентов сотрудника"""
     config = EMPLOYEES_CONFIG.get(user_id)
     if config: return config['clients']
     return {}
+
+def get_client_id(user_id, client_tag):
+    """Получить ID клиента по тегу"""
+    clients = get_user_clients(user_id)
+    client_data = clients.get(client_tag)
+    if isinstance(client_data, dict):
+        return client_data.get("client_id")
+    return client_data  # Обратная совместимость со старым форматом
+
+def get_client_group_chat(user_id, client_tag):
+    """Получить ID группового чата для клиента"""
+    clients = get_user_clients(user_id)
+    client_data = clients.get(client_tag)
+    if isinstance(client_data, dict):
+        group_chat = client_data.get("group_chat_id")
+        return group_chat if group_chat is not None else TARGET_CHAT_ID
+    # Если старый формат или нет данных
+    return TARGET_CHAT_ID
 
 def make_kb(buttons, rows=2, back=True, manual_text=None, skip=True, done_text=None):
     kb = []
@@ -567,11 +598,8 @@ async def broadcast_to_channels(media_files, text, lot_id, specific_chat_id):
         asyncio.create_task(delayed_channel_post(TARGET_CHANNEL_ID, media_files, text, channel_buttons, lot_id))
 
     # 2. МГНОВЕННАЯ ОТПРАВКА В ЦЕЛЕВОЙ ЧАТ
-    # Если это VIP-клиент (человек), то авто-постинг идет в группу VIP
-    if specific_chat_id == 7948650630: 
-        target = VIP_GROUP_ID
-    else:
-        target = specific_chat_id if specific_chat_id else TARGET_CHAT_ID
+    # specific_chat_id теперь уже содержит правильный ID группового чата
+    target = specific_chat_id if specific_chat_id else TARGET_CHAT_ID
     
     if target and target != 0:
         try:
@@ -637,7 +665,7 @@ async def send_final(callback: types.CallbackQuery, state: FSMContext):
     data = await state.get_data(); user_id = callback.from_user.id
     anketa_id = db_get_next_id(user_id); worker_name = db_check_worker(user_id); client_tag = data.get('client')
     
-    target_client_id = get_user_clients(user_id).get(client_tag)
+    target_client_id = get_client_id(user_id, client_tag)
     
     client_link_text = client_tag
     if target_client_id and isinstance(target_client_id, int):
@@ -655,11 +683,10 @@ async def send_final(callback: types.CallbackQuery, state: FSMContext):
     start_kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🔄 Новые часы")]], resize_keyboard=True)
     worker_msg = await callback.message.answer(f"✅ <b>Отправлено!</b>\n🆔 <b>ID: {anketa_id}</b>", reply_markup=start_kb, parse_mode="HTML")
 
-    _, chat_msg_id, chat_text_msg_id = await broadcast_to_channels(data.get("media_files"), public_text, lot_id, target_client_id)
-
-    actual_chat_id = None
-    if target_client_id == 7948650630: actual_chat_id = VIP_GROUP_ID
-    else: actual_chat_id = target_client_id if target_client_id else TARGET_CHAT_ID
+    # Получаем групповой чат для этого клиента
+    actual_chat_id = get_client_group_chat(user_id, client_tag)
+    
+    _, chat_msg_id, chat_text_msg_id = await broadcast_to_channels(data.get("media_files"), public_text, lot_id, actual_chat_id)
 
     # ГЕНЕРАЦИЯ ССЫЛКИ НА ПОСТ
     chat_link = None
@@ -783,7 +810,10 @@ async def change_status_unified(callback: types.CallbackQuery):
                 print(f"❌ Ошибка обновления caption канала: {e}")
 
     # Обновляем чат/группу
-    target_chat = VIP_GROUP_ID if lot_data['target_client_id'] == 7948650630 else lot_data['target_client_id']
+    # Получаем групповой чат для клиента
+    worker_id = lot_data.get('user_id')
+    client_tag = lot_data.get('client_tag')
+    target_chat = get_client_group_chat(worker_id, client_tag) if worker_id and client_tag else lot_data['target_client_id']
     chat_msg_id = lot_data.get('chat_msg_id')
     chat_text_msg_id = lot_data.get('chat_text_msg_id')
     
@@ -804,10 +834,11 @@ async def change_status_unified(callback: types.CallbackQuery):
     # Пересоздаем клавиатуру менеджера с актуальными кнопками
     target_client_id = lot_data.get('target_client_id')
     client_tag = lot_data.get('client_tag', 'Клиент')
+    worker_id = lot_data.get('user_id')
     
     # Получаем ссылку на пост в группе
     chat_msg_id = lot_data.get('chat_msg_id')
-    actual_chat_id = VIP_GROUP_ID if target_client_id == 7948650630 else target_client_id
+    actual_chat_id = get_client_group_chat(worker_id, client_tag) if worker_id and client_tag else target_client_id
     chat_link = None
     if actual_chat_id and chat_msg_id:
         clean_id = str(actual_chat_id).replace("-100", "").replace("-", "")
