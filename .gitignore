@@ -1,0 +1,35 @@
+# База данных
+bot_database.db
+*.db
+
+# Сессии Telethon
+*.session
+*.session-journal
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Переменные окружения
+.env
+*.env
+
+# Логи
+*.log
+
+# Временные файлы
+.DS_Store
+Thumbs.db
