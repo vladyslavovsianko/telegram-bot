@@ -79,8 +79,12 @@ EMPLOYEES_CONFIG = {
 
 DB_FILE = 'bot_database.db'
 LOTS_CACHE = {}
+MAX_CACHE_SIZE = 1000  # Максимальный размер кэша (защита от утечки памяти)
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 user_client = TelegramClient('manager_session', API_ID, API_HASH)
@@ -746,6 +750,14 @@ async def send_final(callback: types.CallbackQuery, state: FSMContext):
             
     except Exception as e: await callback.message.answer(f"❌ Ошибка отправки: {e}")
 
+    # Очистка кэша если он слишком большой (защита от утечки памяти)
+    if len(LOTS_CACHE) > MAX_CACHE_SIZE:
+        # Удаляем самые старые записи (первые 100)
+        old_keys = list(LOTS_CACHE.keys())[:100]
+        for key in old_keys:
+            del LOTS_CACHE[key]
+        logging.info(f"🧹 Очищено {len(old_keys)} старых записей из кэша")
+    
     LOTS_CACHE[lot_id] = {
         "media_files": data.get("media_files"),
         "clean_text": clean_text,
@@ -993,9 +1005,42 @@ async def m_send(m: types.Message, state: FSMContext):
 @dp.message(F.text == "🔄 Новые часы", StateFilter('*'))
 async def new_cycle(m: types.Message, state: FSMContext): await restart_logic(m, state)
 
+# ==========================================
+# ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ОШИБОК
+# ==========================================
+@dp.error()
+async def error_handler(event, exception):
+    """Глобальный обработчик ошибок - предотвращает крах бота"""
+    logging.error(f"❌ Ошибка: {exception}", exc_info=True)
+    
+    # Пытаемся уведомить менеджеров о критической ошибке
+    if MANAGER_IDS:
+        try:
+            error_text = f"⚠️ <b>Ошибка в боте:</b>\n<code>{str(exception)[:500]}</code>"
+            await bot.send_message(MANAGER_IDS[0], error_text, parse_mode="HTML")
+        except:
+            pass
+    
+    return True  # Бот продолжает работу
+
 async def main():
     init_db() # АВТО-ЗАПУСК СОЗДАНИЯ ТАБЛИЦ
-    print("🚀 Бот запущен (Версия 103: Fixed Links & Buttons) ...")
-    await user_client.start(); await dp.start_polling(bot)
+    logging.info("🚀 Бот запущен...")
+    logging.info(f"📊 Менеджеры: {len(MANAGER_IDS)}, Модераторы: {len(STATUS_MODERATORS)}")
+    
+    try:
+        await user_client.start()
+        await dp.start_polling(bot, handle_signals=False)
+    except KeyboardInterrupt:
+        logging.info("🛑 Бот остановлен вручную")
+    except Exception as e:
+        logging.error(f"💥 Критическая ошибка: {e}", exc_info=True)
+        raise
 
-if __name__ == "__main__": asyncio.run(main())
+if __name__ == "__main__": 
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logging.info("👋 Завершение работы...")
+    except Exception as e:
+        logging.error(f"💥 Фатальная ошибка: {e}", exc_info=True)
