@@ -77,7 +77,7 @@ EMPLOYEES_CONFIG = {
             "#VIP_Chat": {"client_id": 610220736, "group_chat_id": -5069461222},
             "#1": {"client_id": 0, "group_chat_id": -5069461222},
             "#2": {"client_id": 0, "group_chat_id": -5069461222},
-            "#3": {"client_id": 0, "group_chat_id": -5069461222},
+            "#136": {"client_id": 0, "group_chat_id": -5295466035},
             "#4": {"client_id": 0, "group_chat_id": -5069461222},
             "#5": {"client_id": 0, "group_chat_id": -5069461222},
             "#6": {"client_id": 0, "group_chat_id": -5069461222},
@@ -103,7 +103,7 @@ EMPLOYEES_CONFIG = {
             "#1": {"client_id": 0, "group_chat_id": -5069461222},
             "#2": {"client_id": 0, "group_chat_id": -5069461222},
             "#3": {"client_id": 0, "group_chat_id": -5069461222},
-            "#4": {"client_id": 0, "group_chat_id": -5069461222},
+            "#136": {"client_id": 0, "group_chat_id": -5295466035},
             "#5": {"client_id": 0, "group_chat_id": -5069461222},
             "#6": {"client_id": 0, "group_chat_id": -5069461222},
             "#7": {"client_id": 0, "group_chat_id": -5069461222},
@@ -250,21 +250,27 @@ def db_get_next_id(user_id):
     return f"{first_letter}{new_counter}"
 
 def db_save_full_order(user_id, worker_name, anketa_id, data):
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute('''INSERT INTO orders (
-            worker_id, worker_name, anketa_id, client_tag, seller_name, seller_number, 
-            table_num, price, chrono_price, negotiation, year, diameter, wrist, kit, 
-            condition, rating
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (
-        user_id, worker_name, anketa_id, data.get('client'), data.get('seller_name'),
-        data.get('seller_number'), data.get('table'), data.get('price'),
-        data.get('chrono_price'), data.get('negotiation'), data.get('year'),
-        data.get('diameter'), data.get('wrist'), data.get('kit'),
-        data.get('condition'), data.get('rating')
-    ))
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute('''INSERT INTO orders (
+                worker_id, worker_name, anketa_id, client_tag, seller_name, seller_number, 
+                table_num, price, chrono_price, negotiation, year, diameter, wrist, kit, 
+                condition, rating
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (
+            user_id, worker_name, anketa_id, data.get('client'), data.get('seller_name'),
+            data.get('seller_number'), data.get('table'), data.get('price'),
+            data.get('chrono_price'), data.get('negotiation'), data.get('year'),
+            data.get('diameter'), data.get('wrist'), data.get('kit'),
+            data.get('condition'), data.get('rating')
+        ))
+        conn.commit()
+        conn.close()
+        logging.info(f"✅ Анкета {anketa_id} сохранена в базу данных")
+    except Exception as e:
+        logging.error(f"❌ Ошибка сохранения анкеты {anketa_id} в базу: {e}")
+        if 'conn' in locals():
+            conn.close()
 
 def db_update_status(anketa_id, new_status):
     conn = sqlite3.connect(DB_FILE)
