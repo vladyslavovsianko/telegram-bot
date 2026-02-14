@@ -77,7 +77,7 @@ EMPLOYEES_CONFIG = {
             "#VIP_Chat": {"client_id": 610220736, "group_chat_id": -5069461222},
             "#1": {"client_id": 0, "group_chat_id": -5069461222},
             "#2": {"client_id": 0, "group_chat_id": -5069461222},
-            "#136": {"client_id": 0, "group_chat_id": -5295466035},
+            "#3": {"client_id": 0, "group_chat_id": -5069461222},
             "#4": {"client_id": 0, "group_chat_id": -5069461222},
             "#5": {"client_id": 0, "group_chat_id": -5069461222},
             "#6": {"client_id": 0, "group_chat_id": -5069461222},
@@ -94,7 +94,8 @@ EMPLOYEES_CONFIG = {
             "#17": {"client_id": 0, "group_chat_id": -5069461222},
             "#18": {"client_id": 0, "group_chat_id": -5069461222},
             "#19": {"client_id": 0, "group_chat_id": -5069461222},
-            "#20": {"client_id": 0, "group_chat_id": -5069461222}
+            "#20": {"client_id": 0, "group_chat_id": -5069461222},
+            "#136": {"client_id": 0, "group_chat_id": -5295466035}
         } 
     },
     645070075: { 
