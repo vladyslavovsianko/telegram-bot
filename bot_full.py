@@ -441,7 +441,11 @@ async def finish_media(message: types.Message, state: FSMContext):
     await check_edit_or_next(message, state, lambda m: start_calculator(m, state, Form.entering_table, "3️⃣ <b>Введи номер СТОЛА:</b>", allow_skip=True))
 
 @dp.message(Form.uploading_media, F.text == "🔙 Назад")
-async def back_to_client(message: types.Message, state: FSMContext): await show_client_menu(message)
+async def back_to_client(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    if data.get("editing_mode"):
+        return await show_final_review(message, state)
+    await show_client_menu(message)
 
 # --- КАЛЬКУЛЯТОР ---
 async def start_calculator(message: types.Message, state: FSMContext, target_state, title, allow_skip=True):
@@ -719,9 +723,9 @@ async def process_edit_click(c: types.CallbackQuery, state: FSMContext):
     field = c.data.split("_")[1]; await state.update_data(editing_mode=True); await c.message.delete(); uid = c.from_user.id
     if field == "client": await show_client_menu(c.message, user_id=uid)
     elif field == "media": await state.update_data(media_files=[]); await show_media_menu(c.message)
-    elif field == "table": await start_calculator(c.message, state, Form.entering_table, "3️⃣ <b>Введи номер СТОЛА:</b>", allow_skip=False)
-    elif field == "price": await start_calculator(c.message, state, Form.entering_price, "4️⃣ <b>Введи ЦЕНУ (EUR):</b>", allow_skip=False)
-    elif field == "chrono": await start_calculator(c.message, state, Form.entering_chrono_price, "5️⃣ <b>Цена CHRONO24:</b>", allow_skip=False)
+    elif field == "table": await start_calculator(c.message, state, Form.entering_table, "3️⃣ <b>Введи номер СТОЛА:</b>", allow_skip=True)
+    elif field == "price": await start_calculator(c.message, state, Form.entering_price, "4️⃣ <b>Введи ЦЕНУ (EUR):</b>", allow_skip=True)
+    elif field == "chrono": await start_calculator(c.message, state, Form.entering_chrono_price, "5️⃣ <b>Цена CHRONO24:</b>", allow_skip=True)
     elif field == "nego": await show_negotiation_menu(c.message)
     elif field == "year": await show_year_menu(c.message)
     elif field == "diam": await show_diameter_menu(c.message)
