@@ -560,7 +560,11 @@ async def show_negotiation_menu(message):
 
 @dp.message(Form.choosing_negotiation)
 async def process_negotiation(message: types.Message, state: FSMContext):
-    if message.text == "🔙 Назад": return await start_calculator(message, state, Form.entering_chrono_price, "5️⃣ <b>Цена CHRONO24:</b>", allow_skip=True)
+    data = await state.get_data()
+    if message.text == "🔙 Назад":
+        if data.get("editing_mode"):
+            return await show_final_review(message, state)
+        return await start_calculator(message, state, Form.entering_chrono_price, "5️⃣ <b>Цена CHRONO24:</b>", allow_skip=True)
     val = message.text
     if message.text == "⏩ Пропустить": val = "—"
     elif message.text == "⛔️ Без торга": val = "Fixed price"
@@ -573,7 +577,11 @@ async def show_year_menu(message):
 
 @dp.message(Form.choosing_year)
 async def process_year(message: types.Message, state: FSMContext):
-    if message.text == "🔙 Назад": return await show_negotiation_menu(message)
+    data = await state.get_data()
+    if message.text == "🔙 Назад":
+        if data.get("editing_mode"):
+            return await show_final_review(message, state)
+        return await show_negotiation_menu(message)
     if message.text == "✍️ Вручную": return await start_calculator(message, state, Form.manual_year, "7️⃣ <b>Введите год:</b>", allow_skip=True)
     val = "—" if message.text == "⏩ Пропустить" else message.text; await state.update_data(year=val); await check_edit_or_next(message, state, show_diameter_menu)
 
@@ -583,7 +591,11 @@ async def show_diameter_menu(message):
 
 @dp.message(Form.choosing_diameter)
 async def process_diameter(message: types.Message, state: FSMContext):
-    if message.text == "🔙 Назад": return await show_year_menu(message)
+    data = await state.get_data()
+    if message.text == "🔙 Назад":
+        if data.get("editing_mode"):
+            return await show_final_review(message, state)
+        return await show_year_menu(message)
     if message.text == "✍️ Вручную": return await start_calculator(message, state, Form.manual_diameter, "8️⃣ <b>Введите диаметр:</b>", allow_skip=True)
     val = "—" if message.text == "⏩ Пропустить" else message.text; await state.update_data(diameter=val); await check_edit_or_next(message, state, show_wrist_menu)
 
@@ -595,7 +607,11 @@ async def show_wrist_menu(message):
 
 @dp.message(Form.choosing_wrist)
 async def process_wrist(message: types.Message, state: FSMContext):
-    if message.text == "🔙 Назад": return await show_diameter_menu(message)
+    data = await state.get_data()
+    if message.text == "🔙 Назад":
+        if data.get("editing_mode"):
+            return await show_final_review(message, state)
+        return await show_diameter_menu(message)
     if message.text == "✍️ Вручную": return await start_calculator(message, state, Form.manual_wrist, "9️⃣ <b>Введите размер запястья:</b>", allow_skip=True)
     val = "—" if message.text == "⏩ Пропустить" else message.text; await state.update_data(wrist=val); await check_edit_or_next(message, state, show_kit_menu)
 
@@ -605,7 +621,11 @@ async def show_kit_menu(message):
 
 @dp.message(Form.choosing_kit)
 async def process_kit(message: types.Message, state: FSMContext):
-    if message.text == "🔙 Назад": return await show_wrist_menu(message)
+    data = await state.get_data()
+    if message.text == "🔙 Назад":
+        if data.get("editing_mode"):
+            return await show_final_review(message, state)
+        return await show_wrist_menu(message)
     val = "—" if message.text == "⏩ Пропустить" else ("Full set" if "Фул" in message.text else ("Box only" if "коробка" in message.text else ("Papers only" if "доки" in message.text else ("Watch only" if "часы" in message.text else message.text))))
     await state.update_data(kit=val); await check_edit_or_next(message, state, show_condition_menu)
 
@@ -615,7 +635,11 @@ async def show_condition_menu(message):
 
 @dp.message(Form.choosing_condition)
 async def process_condition(message: types.Message, state: FSMContext):
-    if message.text == "🔙 Назад": return await show_kit_menu(message)
+    data = await state.get_data()
+    if message.text == "🔙 Назад":
+        if data.get("editing_mode"):
+            return await show_final_review(message, state)
+        return await show_kit_menu(message)
     val = "—" if message.text == "⏩ Пропустить" else ("New / Unworn" if "Новые" in message.text else ("Excellent" if "Отличное" in message.text else ("Good" if "Хорошее" in message.text else ("Worn (no major damage)" if "Носились" in message.text else ("Needs polishing" if "полировку" in message.text else ("Poor" if "Плохое" in message.text else message.text))))))
     await state.update_data(condition=val, seller_name="—"); await check_edit_or_next(message, state, lambda m: start_calculator(m, state, Form.entering_seller_number, "📱 <b>Введи НОМЕР продавца:</b>", allow_skip=True))
 
@@ -635,7 +659,11 @@ async def show_worker_rating_menu(message):
 
 @dp.message(Form.choosing_worker_rating)
 async def process_rating(message: types.Message, state: FSMContext):
-    if message.text == "🔙 Назад": return await start_calculator(message, state, Form.entering_seller_number, "📱 <b>Введи НОМЕР продавца:</b>", allow_skip=True)
+    data = await state.get_data()
+    if message.text == "🔙 Назад":
+        if data.get("editing_mode"):
+            return await show_final_review(message, state)
+        return await start_calculator(message, state, Form.entering_seller_number, "📱 <b>Введи НОМЕР продавца:</b>", allow_skip=True)
     if message.text == "💬 Свой комментарий": await state.set_state(Form.entering_custom_rating); await message.answer("✍️ <b>Напиши комментарий:</b>", reply_markup=ReplyKeyboardRemove(), parse_mode="HTML"); return
     val = "—" if message.text == "⏩ Пропустить" else ("🔥 Highly recommended" if "Сильный" in message.text else ("👍 Good option" if "Можно" in message.text else ("⚠️ Has nuances" if "нюансы" in message.text else ("🤔 Questionable" if "вопросом" in message.text else ("❌ Not recommended" if "Не" in message.text else message.text)))))
     await state.update_data(rating=val); await show_final_review(message, state)
