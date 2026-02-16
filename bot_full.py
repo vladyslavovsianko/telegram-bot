@@ -438,7 +438,7 @@ async def receive_media(message: types.Message, state: FSMContext):
 async def finish_media(message: types.Message, state: FSMContext):
     data = await state.get_data()
     if not data.get("media_files"): return await message.answer("⛔️ Загрузи хотя бы 1 фото.")
-    await check_edit_or_next(message, state, lambda m: start_calculator(m, state, Form.entering_table, "3️⃣ <b>Введи номер СТОЛА:</b>", allow_skip=False))
+    await check_edit_or_next(message, state, lambda m: start_calculator(m, state, Form.entering_table, "3️⃣ <b>Введи номер СТОЛА:</b>", allow_skip=True))
 
 @dp.message(Form.uploading_media, F.text == "🔙 Назад")
 async def back_to_client(message: types.Message, state: FSMContext): await show_client_menu(message)
@@ -467,13 +467,20 @@ async def process_calc_buttons(callback: types.CallbackQuery, state: FSMContext)
                 pass
         
         curr_state = await state.get_state()
-        if curr_state == Form.entering_seller_number: await ask_seller_name(callback.message)
-        elif curr_state == Form.entering_table: await show_media_menu(callback.message)
-        elif curr_state == Form.entering_price: await start_calculator(callback.message, state, Form.entering_table, "3️⃣ <b>Введи номер СТОЛА:</b>", allow_skip=False)
-        elif curr_state == Form.entering_chrono_price: await start_calculator(callback.message, state, Form.entering_price, "4️⃣ <b>Введи ЦЕНУ (EUR):</b>", allow_skip=False)
-        elif curr_state == Form.manual_year: await show_year_menu(callback.message)
-        elif curr_state == Form.manual_diameter: await show_diameter_menu(callback.message)
-        elif curr_state == Form.manual_wrist: await show_wrist_menu(callback.message)
+        editing_mode = data.get("editing_mode", False)
+        
+        # Если в режиме редактирования - вернуться к просмотру анкеты
+        if editing_mode:
+            await show_final_review(callback.message, state)
+        else:
+            # Обычный режим - назад к предыдущему шагу
+            if curr_state == Form.entering_seller_number: await show_condition_menu(callback.message)
+            elif curr_state == Form.entering_table: await show_media_menu(callback.message)
+            elif curr_state == Form.entering_price: await start_calculator(callback.message, state, Form.entering_table, "3️⃣ <b>Введи номер СТОЛА:</b>", allow_skip=True)
+            elif curr_state == Form.entering_chrono_price: await start_calculator(callback.message, state, Form.entering_price, "4️⃣ <b>Введи ЦЕНУ (EUR):</b>", allow_skip=True)
+            elif curr_state == Form.manual_year: await show_year_menu(callback.message)
+            elif curr_state == Form.manual_diameter: await show_diameter_menu(callback.message)
+            elif curr_state == Form.manual_wrist: await show_wrist_menu(callback.message)
         await callback.answer()
         return
 
@@ -529,10 +536,10 @@ async def process_text_input(message: types.Message, state: FSMContext):
         await check_edit_or_next(message, state, show_worker_rating_menu)
     elif curr_state == Form.entering_table:
         await state.update_data(table=final_val)
-        await check_edit_or_next(message, state, lambda m: start_calculator(m, state, Form.entering_price, "4️⃣ <b>Введи ЦЕНУ (EUR):</b>", allow_skip=False))
+        await check_edit_or_next(message, state, lambda m: start_calculator(m, state, Form.entering_price, "4️⃣ <b>Введи ЦЕНУ (EUR):</b>", allow_skip=True))
     elif curr_state == Form.entering_price:
         await state.update_data(price=final_val)
-        await check_edit_or_next(message, state, lambda m: start_calculator(m, state, Form.entering_chrono_price, "5️⃣ <b>Цена CHRONO24:</b>", allow_skip=False))
+        await check_edit_or_next(message, state, lambda m: start_calculator(m, state, Form.entering_chrono_price, "5️⃣ <b>Цена CHRONO24:</b>", allow_skip=True))
     elif curr_state == Form.entering_chrono_price:
         await state.update_data(chrono_price=final_val)
         await check_edit_or_next(message, state, show_negotiation_menu)
@@ -553,7 +560,7 @@ async def show_negotiation_menu(message):
 
 @dp.message(Form.choosing_negotiation)
 async def process_negotiation(message: types.Message, state: FSMContext):
-    if message.text == "🔙 Назад": return await start_calculator(message, state, Form.entering_chrono_price, "5️⃣ <b>Цена CHRONO24:</b>", allow_skip=False)
+    if message.text == "🔙 Назад": return await start_calculator(message, state, Form.entering_chrono_price, "5️⃣ <b>Цена CHRONO24:</b>", allow_skip=True)
     val = message.text
     if message.text == "⏩ Пропустить": val = "—"
     elif message.text == "⛔️ Без торга": val = "Fixed price"
