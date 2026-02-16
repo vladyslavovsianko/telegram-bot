@@ -716,7 +716,10 @@ async def show_edit_menu(c: types.CallbackQuery):
     b.adjust(2, 2, 2, 2, 2, 2, 2, 2, 1); await c.message.edit_reply_markup(reply_markup=b.as_markup())
 
 @dp.callback_query(F.data == "back_to_review")
-async def back_to_rev(c: types.CallbackQuery, state: FSMContext): await check_edit_or_next(c.message, state, None)
+async def back_to_rev(c: types.CallbackQuery, state: FSMContext):
+    await c.answer()
+    await c.message.delete()
+    await show_final_review(c.message, state)
 
 @dp.callback_query(F.data.startswith("edit_"))
 async def process_edit_click(c: types.CallbackQuery, state: FSMContext):
@@ -819,8 +822,77 @@ async def delayed_channel_post(chat_id, media_files, text, buttons, lot_id):
             if text_msg_id:
                 LOTS_CACHE[lot_id]['channel_text_msg_id'] = text_msg_id
             
+            # Обновляем кнопки менеджера с ссылкой на канал
+            await update_manager_buttons_with_channel_link(lot_id, msg_id)
+            
     except Exception as e:
         print(f"❌ Ошибка отложенного поста: {e}")
+
+async def update_manager_buttons_with_channel_link(lot_id, channel_msg_id):
+    """Обновляет кнопки менеджера после публикации в канале"""
+    try:
+        lot_data = LOTS_CACHE.get(lot_id)
+        if not lot_data:
+            return
+        
+        # Создаем ссылку на канал
+        clean_channel_id = str(TARGET_CHANNEL_ID).replace("-100", "")
+        channel_link = f"https://t.me/c/{clean_channel_id}/{channel_msg_id}"
+        
+        # Получаем данные для пересоздания кнопок
+        target_client_id = lot_data.get('target_client_id')
+        client_tag = lot_data.get('client_tag')
+        chat_msg_id = lot_data.get('chat_msg_id')
+        user_id = lot_data.get('user_id')
+        
+        # Ссылка на групповой чат
+        actual_chat_id = get_client_group_chat(user_id, client_tag) if user_id and client_tag else None
+        chat_link = None
+        if actual_chat_id and chat_msg_id:
+            clean_id = str(actual_chat_id).replace("-100", "").replace("-", "")
+            chat_link = f"https://t.me/c/{clean_id}/{chat_msg_id}"
+        
+        # Пересоздаем кнопки
+        mgr_kb = InlineKeyboardBuilder()
+        if target_client_id: 
+            mgr_kb.button(text=f"🚀 Клиенту ({client_tag})", callback_data=f"sendto_client_{lot_id}")
+        else: 
+            mgr_kb.button(text="⚠️ Нет контакта", callback_data=f"clean_text_{lot_id}")
+        
+        if chat_link: 
+            mgr_kb.button(text="💬 Пост в группе", url=chat_link)
+        
+        # Кнопка на канал (теперь с ссылкой!)
+        mgr_kb.button(text="📢 Пост в канале", url=channel_link)
+        
+        if target_client_id and isinstance(target_client_id, int):
+            mgr_kb.button(text="👤 Чат с клиентом", url=f"tg://user?id={target_client_id}")
+        
+        mgr_kb.button(text="📹 Запросить видео", callback_data=f"req_video_{lot_id}")
+        mgr_kb.button(text="✅ БЕРУТ", callback_data=f"client_buy_{lot_id}")
+        mgr_kb.button(text="❌ Отказ", callback_data=f"reject_{lot_id}")
+        mgr_kb.button(text="💬 Коммент", callback_data=f"feedback_start_{lot_id}")
+        
+        mgr_kb.row(
+            InlineKeyboardButton(text="🟡 Rsrv", callback_data=f"set_status_reserved_{lot_id}"),
+            InlineKeyboardButton(text="🟢 Avail", callback_data=f"set_status_available_{lot_id}"),
+            InlineKeyboardButton(text="🔴 Sold", callback_data=f"set_status_sold_{lot_id}")
+        )
+        
+        # Обновляем кнопки у всех менеджеров
+        manager_msgs = lot_data.get('manager_msgs', [])
+        for mgr_info in manager_msgs:
+            try:
+                await bot.edit_message_reply_markup(
+                    chat_id=mgr_info['chat_id'],
+                    message_id=mgr_info['msg_id'],
+                    reply_markup=mgr_kb.as_markup()
+                )
+            except Exception as e:
+                print(f"❌ Не удалось обновить кнопки для менеджера {mgr_info['chat_id']}: {e}")
+    
+    except Exception as e:
+        print(f"❌ Ошибка обновления кнопок менеджера: {e}")
 
 @dp.callback_query(F.data == "send_final")
 async def send_final(callback: types.CallbackQuery, state: FSMContext):
@@ -850,7 +922,7 @@ async def send_final(callback: types.CallbackQuery, state: FSMContext):
     
     _, chat_msg_id, chat_text_msg_id = await broadcast_to_channels(data.get("media_files"), public_text, lot_id, actual_chat_id)
 
-    # ГЕНЕРАЦИЯ ССЫЛКИ НА ПОСТ
+    # ГЕНЕРАЦИЯ ССЫЛКИ НА ПОСТ В ГРУППЕ
     chat_link = None
     if actual_chat_id and chat_msg_id:
         clean_id = str(actual_chat_id).replace("-100", "").replace("-", "")
@@ -863,12 +935,17 @@ async def send_final(callback: types.CallbackQuery, state: FSMContext):
     else: 
         mgr_kb.button(text="⚠️ Нет контакта", callback_data=f"clean_text_{lot_id}")
     
-    # КНОПКА НА ПОСТ
-    if chat_link: mgr_kb.button(text="🔗 Пост в группе", url=chat_link)
+    # КНОПКА НА ПОСТ В ГРУППЕ
+    if chat_link: 
+        mgr_kb.button(text="💬 Пост в группе", url=chat_link)
+    
+    # КНОПКА НА КАНАЛ (будет обновлена после отправки поста)
+    if TARGET_CHANNEL_ID != 0:
+        mgr_kb.button(text="📢 Пост в канале ⏳", callback_data=f"wait_channel_{lot_id}")
     
     # КНОПКА НА ЧАТ С КЛИЕНТОМ
     if target_client_id and isinstance(target_client_id, int):
-        mgr_kb.button(text="💬 Чат с клиентом", url=f"tg://user?id={target_client_id}")
+        mgr_kb.button(text="👤 Чат с клиентом", url=f"tg://user?id={target_client_id}")
 
     mgr_kb.button(text="📹 Запросить видео", callback_data=f"req_video_{lot_id}")
     mgr_kb.button(text="✅ БЕРУТ", callback_data=f"client_buy_{lot_id}")
