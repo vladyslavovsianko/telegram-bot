@@ -442,10 +442,12 @@ async def process_client(message: types.Message, state: FSMContext):
         client = message.text.replace("✅ ", "")
         selected = data.get('selected_clients', [])
         
-        if message.text.startswith("✅ "):
+        if message.text.startswith("✅ ") and not message.text.startswith("✅ Готово"):
             # Убираем из выбранных
             if client in selected:
                 selected.remove(client)
+            await state.update_data(selected_clients=selected)
+            return await show_multi_client_menu(message, state)
         elif message.text == "🔙 Назад":
             # Отменяем множественный выбор
             await state.update_data(multi_mode=False, selected_clients=[])
@@ -454,15 +456,15 @@ async def process_client(message: types.Message, state: FSMContext):
             # Завершаем выбор
             if not selected:
                 return await message.answer("⚠️ Выберите хотя бы одного клиента!")
+            logging.info(f"✅ Выбрано {len(selected)} клиентов: {selected}")
             await state.update_data(multi_clients=selected, client=", ".join(selected), multi_mode=False)
-            return await check_edit_or_next(message, state, show_media_menu)
+            return await show_media_menu(message)
         else:
             # Добавляем в выбранные
             if client not in selected:
                 selected.append(client)
-        
-        await state.update_data(selected_clients=selected)
-        return await show_multi_client_menu(message, state)
+            await state.update_data(selected_clients=selected)
+            return await show_multi_client_menu(message, state)
     
     # Обычный режим - один клиент
     if message.text == "#Test" and message.from_user.id in MANAGER_IDS: 
