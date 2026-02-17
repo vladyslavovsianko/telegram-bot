@@ -1255,23 +1255,8 @@ async def change_status_unified(callback: types.CallbackQuery):
         db_update_status(anketa_id, new_status)
     except: pass
 
-    # Обновляем канал (витрину)
-    chan_msg_id = lot_data.get('channel_msg_id')
-    channel_text_msg_id = lot_data.get('channel_text_msg_id')
-    
-    if TARGET_CHANNEL_ID != 0:
-        # Если есть отдельное текстовое сообщение (медиагруппа), обновляем его БЕЗ кнопок
-        if channel_text_msg_id:
-            try:
-                await bot.edit_message_text(chat_id=TARGET_CHANNEL_ID, message_id=channel_text_msg_id, text=final_public_text, parse_mode="HTML")
-            except Exception as e:
-                print(f"❌ Ошибка обновления текста канала: {e}")
-        # Если нет отдельного текста, обновляем caption медиа БЕЗ кнопок
-        elif chan_msg_id:
-            try:
-                await bot.edit_message_caption(chat_id=TARGET_CHANNEL_ID, message_id=chan_msg_id, caption=final_public_text, parse_mode="HTML")
-            except Exception as e:
-                print(f"❌ Ошибка обновления caption канала: {e}")
+    # Канал (витрина) - не обновляем статус, т.к. это может вызвать проблемы с альбомами
+    # Статус виден только в групповом чате и у менеджеров
 
     # Обновляем чат/группу
     # Получаем групповой чат для клиента
