@@ -772,7 +772,7 @@ async def process_custom_rating_text(message: types.Message, state: FSMContext):
 async def show_final_review(message: types.Message, state: FSMContext):
     await state.update_data(editing_mode=False)
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id); await fsm.set_state(Form.final_review); data = await state.get_data()
-    text = (f"📋 <b>ПРОВЕРКА (Вид для клиента):</b>\n\n👤 Client: {data.get('client')}\n#S{data.get('table')}\n📱 Seller: {data.get('seller_number')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n🗣 Nego: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
+    text = (f"📋 <b>ПРОВЕРКА (Вид для клиента):</b>\n\n👤 Client: {data.get('client')}\nS{data.get('table')}\n📱 Seller: {data.get('seller_number')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n🗣 Nego: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
     builder = InlineKeyboardBuilder(); builder.button(text="✏️ Изменить", callback_data="open_edit_menu"); builder.button(text="✅ ОТПРАВИТЬ МЕНЕДЖЕРУ", callback_data="send_final"); builder.adjust(1)
     msg = await message.answer("Загружаю анкету...", reply_markup=ReplyKeyboardRemove()); await msg.delete()
     media_files = data.get("media_files", [])
@@ -887,29 +887,33 @@ async def delayed_channel_post(chat_id, media_files, text, buttons, lot_id):
     try:
         # Создаем свежую медиагруппу для канала
         channel_media_group = []
-        for item in media_files:
-            if item['type'] == 'photo': channel_media_group.append(InputMediaPhoto(media=item['id'], parse_mode="HTML"))
-            elif item['type'] == 'video': channel_media_group.append(InputMediaVideo(media=item['id'], parse_mode="HTML"))
+        for i, item in enumerate(media_files):
+            if item['type'] == 'photo': 
+                # Добавляем caption только к последнему фото в альбоме
+                caption = text if i == len(media_files) - 1 else None
+                channel_media_group.append(InputMediaPhoto(media=item['id'], caption=caption, parse_mode="HTML"))
+            elif item['type'] == 'video': 
+                caption = text if i == len(media_files) - 1 else None
+                channel_media_group.append(InputMediaVideo(media=item['id'], caption=caption, parse_mode="HTML"))
         
         msg_id = None
         text_msg_id = None
         if len(channel_media_group) > 1:
-            # Медиагруппа: отправляем фото/видео, затем отдельное текстовое сообщение с кнопками
+            # Медиагруппа: отправляем с caption на последнем медиа (БЕЗ кнопок)
             msgs = await bot.send_media_group(chat_id, media=channel_media_group)
-            text_msg = await bot.send_message(chat_id, text, reply_markup=buttons, parse_mode="HTML")
             msg_id = msgs[0].message_id
-            text_msg_id = text_msg.message_id  # ID текстового сообщения для обновления
         else:
-            # Одно медиа: подпись с кнопками
-            if media_files[0]['type'] == 'photo': msg = await bot.send_photo(chat_id, media_files[0]['id'], caption=text, reply_markup=buttons, parse_mode="HTML")
-            else: msg = await bot.send_video(chat_id, media_files[0]['id'], caption=text, reply_markup=buttons, parse_mode="HTML")
+            # Одно медиа: подпись БЕЗ кнопок
+            if media_files[0]['type'] == 'photo': 
+                msg = await bot.send_photo(chat_id, media_files[0]['id'], caption=text, parse_mode="HTML")
+            else: 
+                msg = await bot.send_video(chat_id, media_files[0]['id'], caption=text, parse_mode="HTML")
             msg_id = msg.message_id
         
         # Обновляем кэш
         if lot_id in LOTS_CACHE:
             LOTS_CACHE[lot_id]['channel_msg_id'] = msg_id
-            if text_msg_id:
-                LOTS_CACHE[lot_id]['channel_text_msg_id'] = text_msg_id
+            LOTS_CACHE[lot_id]['channel_text_msg_id'] = None  # Больше нет отдельного текста
             
             # Обновляем кнопки менеджера с ссылкой на канал
             await update_manager_buttons_with_channel_link(lot_id, msg_id)
@@ -997,11 +1001,11 @@ async def send_final(callback: types.CallbackQuery, state: FSMContext):
     if target_client_id and isinstance(target_client_id, int):
         client_link_text = f'<a href="tg://user?id={target_client_id}">{client_tag}</a>'
 
-    manager_body = (f"🆔 <b>ID: {anketa_id}</b>\n👤 <b>От:</b> {worker_name}\n🏷 <b>Клиент:</b> {client_link_text}\n#S{data.get('table')}\n📱 Seller: {data.get('seller_number')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n🗣 Nego: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
+    manager_body = (f"🆔 <b>ID: {anketa_id}</b>\n👤 <b>От:</b> {worker_name}\n🏷 <b>Клиент:</b> {client_link_text}\nS{data.get('table')}\n📱 Seller: {data.get('seller_number')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n🗣 Nego: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
     manager_text_final = f"🟢 <b>Status: Available</b>\n\n{manager_body}"
 
-    public_text = (f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\nClient {client_tag}\n🆔 <b>ID: {anketa_id}</b>\n#S{data.get('table')}\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n🗣 Nego: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}")
-    clean_text = (f"👤 <b>{worker_name}</b>\nClient {client_tag}\n🆔 <b>ID: {anketa_id}</b>\n#S{data.get('table')}\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n🗣 Nego: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}")
+    public_text = (f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\nClient {client_tag}\n🆔 <b>ID: {anketa_id}</b>\nS{data.get('table')}\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n🗣 Nego: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}")
+    clean_text = (f"👤 <b>{worker_name}</b>\nClient {client_tag}\n🆔 <b>ID: {anketa_id}</b>\nS{data.get('table')}\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n🗣 Nego: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}")
 
     db_save_full_order(user_id, worker_name, anketa_id, data)
     lot_id = str(uuid.uuid4())[:8]
@@ -1127,16 +1131,16 @@ async def change_status_unified(callback: types.CallbackQuery):
     channel_text_msg_id = lot_data.get('channel_text_msg_id')
     
     if TARGET_CHANNEL_ID != 0:
-        # Если есть отдельное текстовое сообщение (медиагруппа), обновляем его
+        # Если есть отдельное текстовое сообщение (медиагруппа), обновляем его БЕЗ кнопок
         if channel_text_msg_id:
             try:
-                await bot.edit_message_text(chat_id=TARGET_CHANNEL_ID, message_id=channel_text_msg_id, text=final_public_text, reply_markup=get_channel_status_kb(lot_id), parse_mode="HTML")
+                await bot.edit_message_text(chat_id=TARGET_CHANNEL_ID, message_id=channel_text_msg_id, text=final_public_text, parse_mode="HTML")
             except Exception as e:
                 print(f"❌ Ошибка обновления текста канала: {e}")
-        # Если нет отдельного текста, обновляем caption медиа
+        # Если нет отдельного текста, обновляем caption медиа БЕЗ кнопок
         elif chan_msg_id:
             try:
-                await bot.edit_message_caption(chat_id=TARGET_CHANNEL_ID, message_id=chan_msg_id, caption=final_public_text, reply_markup=get_channel_status_kb(lot_id), parse_mode="HTML")
+                await bot.edit_message_caption(chat_id=TARGET_CHANNEL_ID, message_id=chan_msg_id, caption=final_public_text, parse_mode="HTML")
             except Exception as e:
                 print(f"❌ Ошибка обновления caption канала: {e}")
 
