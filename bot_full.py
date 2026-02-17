@@ -422,19 +422,21 @@ async def show_client_menu(message: types.Message, user_id=None):
         else: await message.answer("⚠️ Нет клиентов."); return
     
     # Добавляем кнопку для множественного выбора
-    kb = make_kb(clients_list, rows=3, back=False, skip=False, manual_text="👥 Другие работники", done_text="📋 Несколько клиентов") 
+    kb = make_kb(clients_list, rows=3, back=False, skip=False, done_text="📋 Несколько клиентов") 
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id)
     await fsm.set_state(Form.choosing_client)
     await message.answer("1️⃣ <b>Выбери клиента:</b>", reply_markup=kb, parse_mode="HTML")
 
 @dp.message(Form.choosing_client)
 async def process_client(message: types.Message, state: FSMContext):
-    if message.text == "👥 Другие работники":
-        return await show_other_workers_menu(message, state)
+    logging.info(f"🔍 process_client вызван: текст='{message.text}'")
+    
     if message.text == "📋 Несколько клиентов":
+        logging.info("▶ Переход в режим множественного выбора")
         return await start_multi_client_selection(message, state)
     
     data = await state.get_data()
+    logging.info(f"🔍 State data: multi_mode={data.get('multi_mode')}, selected={data.get('selected_clients', [])}")
     
     # Проверяем режим множественного выбора
     if data.get('multi_mode'):
