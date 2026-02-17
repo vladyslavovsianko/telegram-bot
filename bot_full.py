@@ -966,7 +966,8 @@ async def delayed_channel_post(chat_id, media_files, text, buttons, lot_id):
         if len(channel_media_group) > 1:
             # Медиагруппа: отправляем с caption на последнем медиа (БЕЗ кнопок)
             msgs = await bot.send_media_group(chat_id, media=channel_media_group)
-            msg_id = msgs[0].message_id
+            # Сохраняем ID ПОСЛЕДНЕГО сообщения (где caption)
+            msg_id = msgs[-1].message_id
         else:
             # Одно медиа: подпись БЕЗ кнопок
             if media_files[0]['type'] == 'photo': 
@@ -1255,30 +1256,52 @@ async def change_status_unified(callback: types.CallbackQuery):
         db_update_status(anketa_id, new_status)
     except: pass
 
-    # Канал (витрина) - не обновляем статус, т.к. это может вызвать проблемы с альбомами
-    # Статус виден только в групповом чате и у менеджеров
+    # Обновляем КАНАЛ (витрину)
+    chan_msg_id = lot_data.get('channel_msg_id')
+    
+    if TARGET_CHANNEL_ID != 0 and chan_msg_id:
+        try:
+            # Редактируем caption последнего фото в альбоме (где находится текст)
+            await bot.edit_message_caption(
+                chat_id=TARGET_CHANNEL_ID, 
+                message_id=chan_msg_id, 
+                caption=final_public_text, 
+                parse_mode="HTML"
+            )
+            logging.info(f"✅ Статус обновлен в канале")
+        except Exception as e:
+            logging.error(f"❌ Ошибка обновления канала: {e}")
 
-    # Обновляем чат/группу
-    # Получаем групповой чат для клиента
+    # Обновляем ГРУППОВОЙ ЧАТ
     worker_id = lot_data.get('user_id')
     client_tag = lot_data.get('client_tag')
     target_chat = get_client_group_chat(worker_id, client_tag) if worker_id and client_tag else lot_data['target_client_id']
-    chat_msg_id = lot_data.get('chat_msg_id')
     chat_text_msg_id = lot_data.get('chat_text_msg_id')
+    chat_msg_id = lot_data.get('chat_msg_id')
     
     if target_chat and isinstance(target_chat, int) and target_chat < 0:
-        # Если есть отдельное текстовое сообщение (медиагруппа), обновляем его
-        if chat_text_msg_id:
-            try:
-                await bot.edit_message_text(chat_id=target_chat, message_id=chat_text_msg_id, text=final_public_text, reply_markup=get_channel_status_kb(lot_id), parse_mode="HTML")
-            except Exception as e:
-                print(f"❌ Ошибка обновления текста чата: {e}")
-        # Если нет отдельного текста, обновляем caption медиа
-        elif chat_msg_id:
-            try:
-                await bot.edit_message_caption(chat_id=target_chat, message_id=chat_msg_id, caption=final_public_text, reply_markup=get_channel_status_kb(lot_id), parse_mode="HTML")
-            except Exception as e:
-                print(f"❌ Ошибка обновления caption чата: {e}")
+        try:
+            # Для альбома в чате есть отдельное текстовое сообщение
+            if chat_text_msg_id:
+                await bot.edit_message_text(
+                    chat_id=target_chat, 
+                    message_id=chat_text_msg_id, 
+                    text=final_public_text, 
+                    reply_markup=get_channel_status_kb(lot_id), 
+                    parse_mode="HTML"
+                )
+            # Если одно фото/видео - редактируем caption
+            elif chat_msg_id:
+                await bot.edit_message_caption(
+                    chat_id=target_chat, 
+                    message_id=chat_msg_id, 
+                    caption=final_public_text, 
+                    reply_markup=get_channel_status_kb(lot_id), 
+                    parse_mode="HTML"
+                )
+            logging.info(f"✅ Статус обновлен в чате {target_chat}")
+        except Exception as e:
+            logging.error(f"❌ Ошибка обновления чата: {e}")
 
     # Пересоздаем клавиатуру менеджера с актуальными кнопками
     target_client_id = lot_data.get('target_client_id')
