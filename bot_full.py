@@ -906,6 +906,39 @@ async def check_edit_or_next(message, state, next_func):
 # ОТПРАВКА И ПОСТИНГ
 # ==========================================
 
+async def broadcast_to_channels_chat_only(media_files, text, specific_chat_id):
+    """Отправляет пост только в конкретный чат (без канала)"""
+    channel_buttons = get_channel_status_kb("")
+    chat_msg_id = None
+    chat_text_msg_id = None
+    
+    target = specific_chat_id if specific_chat_id else TARGET_CHAT_ID
+    
+    if target and target != 0:
+        try:
+            # Создаем свежую медиагруппу для чата
+            chat_media_group = []
+            for item in media_files:
+                if item['type'] == 'photo': chat_media_group.append(InputMediaPhoto(media=item['id'], parse_mode="HTML"))
+                elif item['type'] == 'video': chat_media_group.append(InputMediaVideo(media=item['id'], parse_mode="HTML"))
+            
+            if len(chat_media_group) > 1:
+                # Медиагруппа: отправляем фото/видео, затем отдельное текстовое сообщение с кнопками
+                msgs = await bot.send_media_group(target, media=chat_media_group)
+                text_msg = await bot.send_message(target, text, reply_markup=channel_buttons, parse_mode="HTML")
+                chat_msg_id = msgs[0].message_id
+                chat_text_msg_id = text_msg.message_id
+            else:
+                # Одно медиа: подпись с кнопками
+                msg = None
+                if media_files[0]['type'] == 'photo': msg = await bot.send_photo(target, media_files[0]['id'], caption=text, reply_markup=channel_buttons, parse_mode="HTML")
+                else: msg = await bot.send_video(target, media_files[0]['id'], caption=text, reply_markup=channel_buttons, parse_mode="HTML")
+                chat_msg_id = msg.message_id
+        except Exception as e:
+            print(f"❌ Ошибка чата {target}: {e}")
+            
+    return None, chat_msg_id, chat_text_msg_id
+
 async def broadcast_to_channels(media_files, text, lot_id, specific_chat_id):
     """Отправляет пост в Канал (отложенно) и В КОНКРЕТНЫЙ ЧАТ (сразу)"""
     channel_buttons = get_channel_status_kb(lot_id)
@@ -1084,7 +1117,18 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
     
     await callback.message.answer(f"✅ <b>Отправляю анкету {len(multi_clients)} клиентам...</b>\n🆔 <b>ID: {anketa_id}</b>", reply_markup=start_kb, parse_mode="HTML")
     
+    # Создаем общий lot_id для всех клиентов (для статуса в канале)
+    main_lot_id = str(uuid.uuid4())[:8]
+    first_client_tag = multi_clients[0]
+    target_client_id = get_client_id(client_owner_id, first_client_tag)
+    
+    clean_text = (f"👤 <b>{worker_name}</b>\nClient {first_client_tag}\n🆔 <b>ID: {anketa_id}</b>\nS{data.get('table')}\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n🗣 Nego: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}")
+    
     # Отправляем в каждый чат клиента
+    first_chat_msg_id = None
+    first_chat_text_msg_id = None
+    is_first = True
+    
     for client_tag in multi_clients:
         # Получаем групповой чат для каждого клиента
         actual_chat_id = get_client_group_chat(client_owner_id, client_tag)
@@ -1092,7 +1136,15 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
         public_text = (f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\nClient {client_tag}\n🆔 <b>ID: {anketa_id}</b>\nS{data.get('table')}\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n🗣 Nego: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}")
         
         try:
-            await broadcast_to_channels(data.get("media_files"), public_text, f"{anketa_id}_{client_tag}", actual_chat_id)
+            # Используем main_lot_id только для ПЕРВОГО клиента (для канала), остальным отправляем только в чат
+            if is_first:
+                _, chat_msg_id, chat_text_msg_id = await broadcast_to_channels(data.get("media_files"), public_text, main_lot_id, actual_chat_id)
+                first_chat_msg_id = chat_msg_id
+                first_chat_text_msg_id = chat_text_msg_id
+                is_first = False
+            else:
+                # Для остальных клиентов только в чат, без канала (передаем пустой lot_id)
+                _, chat_msg_id, chat_text_msg_id = await broadcast_to_channels_chat_only(data.get("media_files"), public_text, actual_chat_id)
             logging.info(f"✅ Отправлено {client_tag}")
         except Exception as e:
             logging.error(f"❌ Ошибка отправки {client_tag}: {e}")
@@ -1101,7 +1153,42 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
     manager_body = (f"🆔 <b>ID: {anketa_id}</b>\n👤 <b>От:</b> {worker_name}\n🏷 <b>Клиенты:</b> {clients_display}\nS{data.get('table')}\n📱 Seller: {data.get('seller_number')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n🗣 Nego: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
     manager_text_final = f"🟢 <b>Status: Available</b>\n\n{manager_body}\n\n📤 <b>Отправлено {len(multi_clients)} клиентам</b>"
     
+    # Генерируем ссылку на первый групповой чат
+    actual_chat_id = get_client_group_chat(client_owner_id, first_client_tag)
+    chat_link = None
+    if actual_chat_id and first_chat_msg_id:
+        clean_id = str(actual_chat_id).replace("-100", "").replace("-", "")
+        chat_link = f"https://t.me/c/{clean_id}/{first_chat_msg_id}"
+    
+    # Создаем кнопки для менеджера
+    mgr_kb = InlineKeyboardBuilder()
+    if target_client_id: 
+        mgr_kb.button(text=f"🚀 Клиенту ({first_client_tag})", callback_data=f"sendto_client_{main_lot_id}")
+    else: 
+        mgr_kb.button(text="⚠️ Нет контакта", callback_data=f"clean_text_{main_lot_id}")
+    
+    if chat_link: 
+        mgr_kb.button(text="💬 Пост в группе", url=chat_link)
+    
+    if TARGET_CHANNEL_ID != 0:
+        mgr_kb.button(text="📢 Пост в канале ⏳", callback_data=f"wait_channel_{main_lot_id}")
+    
+    if target_client_id and isinstance(target_client_id, int):
+        mgr_kb.button(text="👤 Чат с клиентом", url=f"tg://user?id={target_client_id}")
+
+    mgr_kb.button(text="📹 Запросить видео", callback_data=f"req_video_{main_lot_id}")
+    mgr_kb.button(text="✅ БЕРУТ", callback_data=f"client_buy_{main_lot_id}")
+    mgr_kb.button(text="❌ Отказ", callback_data=f"reject_{main_lot_id}")
+    mgr_kb.button(text="💬 Коммент", callback_data=f"feedback_start_{main_lot_id}")
+    
+    mgr_kb.row(
+        InlineKeyboardButton(text="🟡 Rsrv", callback_data=f"set_status_reserved_{main_lot_id}"),
+        InlineKeyboardButton(text="🟢 Avail", callback_data=f"set_status_available_{main_lot_id}"),
+        InlineKeyboardButton(text="🔴 Sold", callback_data=f"set_status_sold_{main_lot_id}")
+    )
+    
     # Отправляем менеджерам
+    manager_msgs_info = []
     try:
         mf = data.get("media_files"); mg = []
         for i in mf:
@@ -1111,17 +1198,42 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
         
         for mgr_id in MANAGER_IDS:
             try:
+                msg_id = None
                 if len(mg) > 1:
-                    await bot.send_media_group(mgr_id, media=mg)
+                    msgs = await bot.send_media_group(mgr_id, media=mg)
+                    await bot.send_message(mgr_id, "Действия:", reply_markup=mgr_kb.as_markup())
+                    msg_id = msgs[0].message_id
                 else:
                     if mf[0]['type'] == 'photo': 
-                        await bot.send_photo(mgr_id, mf[0]['id'], caption=manager_text_final, parse_mode="HTML")
+                        msg = await bot.send_photo(mgr_id, mf[0]['id'], caption=manager_text_final, reply_markup=mgr_kb.as_markup(), parse_mode="HTML")
                     else: 
-                        await bot.send_video(mgr_id, mf[0]['id'], caption=manager_text_final, parse_mode="HTML")
+                        msg = await bot.send_video(mgr_id, mf[0]['id'], caption=manager_text_final, reply_markup=mgr_kb.as_markup(), parse_mode="HTML")
+                    msg_id = msg.message_id
+                
+                if msg_id:
+                    manager_msgs_info.append({'chat_id': mgr_id, 'msg_id': msg_id})
             except Exception as e: 
                 print(f"Не удалось отправить менеджеру {mgr_id}: {e}")
     except Exception as e: 
         await callback.message.answer(f"❌ Ошибка отправки: {e}")
+    
+    # Сохраняем в кэш
+    LOTS_CACHE[main_lot_id] = {
+        "media_files": data.get("media_files"),
+        "clean_text": clean_text,
+        "manager_body": manager_body,
+        "user_id": user_id,
+        "target_client_id": target_client_id,
+        "client_tag": first_client_tag,
+        "worker_msg_id": None,
+        "worker_name": worker_name,
+        "channel_msg_id": None,
+        "channel_text_msg_id": None,
+        "chat_msg_id": first_chat_msg_id,
+        "chat_text_msg_id": first_chat_text_msg_id,
+        "manager_msgs": manager_msgs_info
+    }
+    logging.info(f"💾 Сохранен lot_id={main_lot_id} для множественной отправки")
     
     db_save_full_order(user_id, worker_name, anketa_id, data)
     await state.clear()
@@ -1229,6 +1341,7 @@ async def send_to_single_client(callback, state, user_id, worker_name, anketa_id
         "chat_text_msg_id": chat_text_msg_id,
         "manager_msgs": manager_msgs_info
     }
+    logging.info(f"💾 Сохранен lot_id={lot_id} в LOTS_CACHE")
 
     await state.clear()
 
@@ -1241,8 +1354,14 @@ async def change_status_unified(callback: types.CallbackQuery):
 
     parts = callback.data.split("_")
     new_status = parts[2]; lot_id = parts[3]
+    
+    logging.info(f"🔍 Смена статуса: callback_data={callback.data}, lot_id={lot_id}")
+    logging.info(f"🔍 LOTS_CACHE keys: {list(LOTS_CACHE.keys())}")
+    
     lot_data = LOTS_CACHE.get(lot_id)
-    if not lot_data: return await callback.answer("Лот устарел", show_alert=True)
+    if not lot_data: 
+        logging.error(f"❌ Лот {lot_id} не найден в кэше!")
+        return await callback.answer("Лот устарел", show_alert=True)
     
     if new_status == "reserved": header = "🟡 <b>Status: Reserved (Search Client)</b>"
     elif new_status == "sold": header = "🔴 <b>Status: SOLD</b>"
