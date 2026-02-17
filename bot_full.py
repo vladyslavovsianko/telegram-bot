@@ -74,10 +74,10 @@ EMPLOYEES_CONFIG = {
     },
     610220736: { 
         "clients": { 
-            "#VIP_Chat": {"client_id": 610220736, "group_chat_id": -5069461222},
-            "#1": {"client_id": 0, "group_chat_id": -5069461222},
-            "#2": {"client_id": 0, "group_chat_id": -5069461222},
-            "#3": {"client_id": 0, "group_chat_id": -5069461222},
+            "#VIP_Chat": {"client_id": 610220736, "group_chat_id": -1003745353210},
+            "#1": {"client_id": 0, "group_chat_id": -5182586637},
+            "#2": {"client_id": 0, "group_chat_id": -5105834721},
+            "#3": {"client_id": 0, "group_chat_id": -5029226279},
             "#4": {"client_id": 0, "group_chat_id": -5069461222},
             "#5": {"client_id": 0, "group_chat_id": -5069461222},
             "#6": {"client_id": 0, "group_chat_id": -5069461222},
