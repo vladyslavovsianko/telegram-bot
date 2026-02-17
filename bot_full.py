@@ -421,8 +421,8 @@ async def show_client_menu(message: types.Message, user_id=None):
         if user_id in MANAGER_IDS: pass
         else: await message.answer("⚠️ Нет клиентов."); return
     
-    # Добавляем кнопку для просмотра клиентов других работников
-    kb = make_kb(clients_list, rows=3, back=False, skip=False, manual_text="👥 Другие работники") 
+    # Добавляем кнопку для множественного выбора
+    kb = make_kb(clients_list, rows=3, back=False, skip=False, manual_text="👥 Другие работники", done_text="📋 Несколько клиентов") 
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id)
     await fsm.set_state(Form.choosing_client)
     await message.answer("1️⃣ <b>Выбери клиента:</b>", reply_markup=kb, parse_mode="HTML")
@@ -431,9 +431,70 @@ async def show_client_menu(message: types.Message, user_id=None):
 async def process_client(message: types.Message, state: FSMContext):
     if message.text == "👥 Другие работники":
         return await show_other_workers_menu(message, state)
-    if message.text == "#Test" and message.from_user.id in MANAGER_IDS: await state.update_data(client="#Test")
-    else: await state.update_data(client=message.text)
+    if message.text == "📋 Несколько клиентов":
+        return await start_multi_client_selection(message, state)
+    
+    data = await state.get_data()
+    
+    # Проверяем режим множественного выбора
+    if data.get('multi_mode'):
+        # Убираем галочку если есть
+        client = message.text.replace("✅ ", "")
+        selected = data.get('selected_clients', [])
+        
+        if message.text.startswith("✅ "):
+            # Убираем из выбранных
+            if client in selected:
+                selected.remove(client)
+        elif message.text == "🔙 Назад":
+            # Отменяем множественный выбор
+            await state.update_data(multi_mode=False, selected_clients=[])
+            return await show_client_menu(message, user_id=message.from_user.id)
+        elif message.text.startswith("✅ Готово"):
+            # Завершаем выбор
+            if not selected:
+                return await message.answer("⚠️ Выберите хотя бы одного клиента!")
+            await state.update_data(multi_clients=selected, client=", ".join(selected), multi_mode=False)
+            return await check_edit_or_next(message, state, show_media_menu)
+        else:
+            # Добавляем в выбранные
+            if client not in selected:
+                selected.append(client)
+        
+        await state.update_data(selected_clients=selected)
+        return await show_multi_client_menu(message, state)
+    
+    # Обычный режим - один клиент
+    if message.text == "#Test" and message.from_user.id in MANAGER_IDS: 
+        await state.update_data(client="#Test")
+    else: 
+        await state.update_data(client=message.text)
     await check_edit_or_next(message, state, show_media_menu)
+
+async def start_multi_client_selection(message: types.Message, state: FSMContext):
+    """Начинаем выбор нескольких клиентов"""
+    await state.update_data(selected_clients=[], multi_mode=True)
+    await show_multi_client_menu(message, state)
+
+async def show_multi_client_menu(message: types.Message, state: FSMContext):
+    """Показываем меню выбора с отметками"""
+    user_id = message.from_user.id
+    data = await state.get_data()
+    selected = data.get('selected_clients', [])
+    
+    clients_dict = get_user_clients(user_id)
+    clients_list = []
+    
+    # Добавляем галочки к выбранным клиентам
+    for client in clients_dict.keys():
+        if client in selected:
+            clients_list.append(f"✅ {client}")
+        else:
+            clients_list.append(client)
+    
+    selected_count = len(selected)
+    kb = make_kb(clients_list, rows=3, back=True, skip=False, done_text=f"✅ Готово ({selected_count})" if selected_count > 0 else None)
+    await message.answer(f"📋 <b>Выбери клиентов ({selected_count} выбрано):</b>", reply_markup=kb, parse_mode="HTML")
 
 async def show_other_workers_menu(message: types.Message, state: FSMContext):
     """Показывает список других работников"""
@@ -992,9 +1053,73 @@ async def send_final(callback: types.CallbackQuery, state: FSMContext):
     data = await state.get_data(); user_id = callback.from_user.id
     anketa_id = db_get_next_id(user_id); worker_name = db_check_worker(user_id); client_tag = data.get('client')
     
+    # Проверяем режим множественного выбора
+    multi_clients = data.get('multi_clients', [])
+    is_multi = len(multi_clients) > 0
+    
     # Проверяем, выбран ли клиент другого работника
     client_owner_id = data.get('client_owner_id', user_id)  # Используем ID владельца клиента
     
+    if is_multi:
+        # Множественная отправка
+        await send_to_multiple_clients(callback, state, user_id, worker_name, anketa_id, data, multi_clients, client_owner_id)
+    else:
+        # Обычная отправка одному клиенту
+        await send_to_single_client(callback, state, user_id, worker_name, anketa_id, data, client_tag, client_owner_id)
+
+async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa_id, data, multi_clients, client_owner_id):
+    """Отправка анкеты нескольким клиентам"""
+    start_kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🔄 Новые часы")]], resize_keyboard=True)
+    
+    # Формируем список клиентов для отображения
+    clients_display = ", ".join(multi_clients)
+    
+    await callback.message.answer(f"✅ <b>Отправляю анкету {len(multi_clients)} клиентам...</b>\n🆔 <b>ID: {anketa_id}</b>", reply_markup=start_kb, parse_mode="HTML")
+    
+    # Отправляем в каждый чат клиента
+    for client_tag in multi_clients:
+        # Получаем групповой чат для каждого клиента
+        actual_chat_id = get_client_group_chat(client_owner_id, client_tag)
+        
+        public_text = (f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\nClient {client_tag}\n🆔 <b>ID: {anketa_id}</b>\nS{data.get('table')}\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n🗣 Nego: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}")
+        
+        try:
+            await broadcast_to_channels(data.get("media_files"), public_text, f"{anketa_id}_{client_tag}", actual_chat_id)
+            logging.info(f"✅ Отправлено {client_tag}")
+        except Exception as e:
+            logging.error(f"❌ Ошибка отправки {client_tag}: {e}")
+    
+    # Отправляем менеджеру сводку
+    manager_body = (f"🆔 <b>ID: {anketa_id}</b>\n👤 <b>От:</b> {worker_name}\n🏷 <b>Клиенты:</b> {clients_display}\nS{data.get('table')}\n📱 Seller: {data.get('seller_number')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n🗣 Nego: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
+    manager_text_final = f"🟢 <b>Status: Available</b>\n\n{manager_body}\n\n📤 <b>Отправлено {len(multi_clients)} клиентам</b>"
+    
+    # Отправляем менеджерам
+    try:
+        mf = data.get("media_files"); mg = []
+        for i in mf:
+            if i['type'] == 'photo': mg.append(InputMediaPhoto(media=i['id'], parse_mode="HTML"))
+            elif i['type'] == 'video': mg.append(InputMediaVideo(media=i['id'], parse_mode="HTML"))
+        mg[0].caption = manager_text_final; mg[0].parse_mode = "HTML"
+        
+        for mgr_id in MANAGER_IDS:
+            try:
+                if len(mg) > 1:
+                    await bot.send_media_group(mgr_id, media=mg)
+                else:
+                    if mf[0]['type'] == 'photo': 
+                        await bot.send_photo(mgr_id, mf[0]['id'], caption=manager_text_final, parse_mode="HTML")
+                    else: 
+                        await bot.send_video(mgr_id, mf[0]['id'], caption=manager_text_final, parse_mode="HTML")
+            except Exception as e: 
+                print(f"Не удалось отправить менеджеру {mgr_id}: {e}")
+    except Exception as e: 
+        await callback.message.answer(f"❌ Ошибка отправки: {e}")
+    
+    db_save_full_order(user_id, worker_name, anketa_id, data)
+    await state.clear()
+
+async def send_to_single_client(callback, state, user_id, worker_name, anketa_id, data, client_tag, client_owner_id):
+    """Отправка анкеты одному клиенту"""
     target_client_id = get_client_id(client_owner_id, client_tag)
     
     client_link_text = client_tag
