@@ -243,12 +243,22 @@ def db_get_next_id(user_id):
     data = cursor.fetchone()
     if not data: conn.close(); return "UNK0" 
     name, current_counter = data
-    first_letter = name[0].upper() if name else "X"
+    
+    # Уникальные префиксы для каждого работника
+    PREFIX_MAP = {
+        610220736: "MM",      # Misha M
+        5442618444: "MK",     # Misha K
+        645070075: "VL",      # Vladyslav
+        625971673: "VIT",     # Vitalij
+        419890021: "O",       # Oleh
+    }
+    
+    prefix = PREFIX_MAP.get(user_id, name[0].upper() if name else "X")
     new_counter = current_counter + 1
     cursor.execute("UPDATE workers SET counter = ? WHERE user_id = ?", (new_counter, user_id))
     conn.commit()
     conn.close()
-    return f"{first_letter}{new_counter}"
+    return f"{prefix}{new_counter}"
 
 def db_save_full_order(user_id, worker_name, anketa_id, data):
     try:
@@ -288,6 +298,8 @@ def db_update_status(anketa_id, new_status):
 
 class Form(StatesGroup):
     choosing_client = State()
+    choosing_other_worker = State()  # Выбор другого работника
+    choosing_other_worker_client = State()  # Выбор клиента другого работника
     uploading_media = State()
     entering_table = State()
     entering_price = State()
@@ -408,15 +420,92 @@ async def show_client_menu(message: types.Message, user_id=None):
     if not clients_list:
         if user_id in MANAGER_IDS: pass
         else: await message.answer("⚠️ Нет клиентов."); return
-    kb = make_kb(clients_list, rows=3, back=False, skip=False) 
+    
+    # Добавляем кнопку для просмотра клиентов других работников
+    kb = make_kb(clients_list, rows=3, back=False, skip=False, manual_text="👥 Другие работники") 
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id)
     await fsm.set_state(Form.choosing_client)
     await message.answer("1️⃣ <b>Выбери клиента:</b>", reply_markup=kb, parse_mode="HTML")
 
 @dp.message(Form.choosing_client)
 async def process_client(message: types.Message, state: FSMContext):
+    if message.text == "👥 Другие работники":
+        return await show_other_workers_menu(message, state)
     if message.text == "#Test" and message.from_user.id in MANAGER_IDS: await state.update_data(client="#Test")
     else: await state.update_data(client=message.text)
+    await check_edit_or_next(message, state, show_media_menu)
+
+async def show_other_workers_menu(message: types.Message, state: FSMContext):
+    """Показывает список других работников"""
+    current_user_id = message.from_user.id
+    
+    # Получаем список всех работников кроме текущего
+    workers_list = []
+    for worker_id, config in EMPLOYEES_CONFIG.items():
+        if worker_id != current_user_id and config.get('clients'):
+            worker_name = db_check_worker(worker_id)
+            if worker_name:
+                workers_list.append(f"👤 {worker_name}")
+    
+    if not workers_list:
+        await message.answer("⚠️ Нет других работников")
+        return await show_client_menu(message, user_id=current_user_id)
+    
+    kb = make_kb(workers_list, rows=2, back=True, skip=False)
+    fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id)
+    await fsm.set_state(Form.choosing_other_worker)
+    await message.answer("👥 <b>Выбери работника:</b>", reply_markup=kb, parse_mode="HTML")
+
+@dp.message(Form.choosing_other_worker)
+async def process_other_worker(message: types.Message, state: FSMContext):
+    if message.text == "🔙 Назад":
+        return await show_client_menu(message, user_id=message.from_user.id)
+    
+    # Убираем "👤 " из имени
+    worker_name = message.text.replace("👤 ", "")
+    
+    # Находим ID работника по имени
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id FROM workers WHERE name = ?", (worker_name,))
+    result = cursor.fetchone()
+    conn.close()
+    
+    if not result:
+        await message.answer("⚠️ Работник не найден")
+        return await show_other_workers_menu(message, state)
+    
+    worker_id = result[0]
+    
+    # Получаем клиентов этого работника
+    clients_dict = get_user_clients(worker_id)
+    clients_list = list(clients_dict.keys())
+    
+    if not clients_list:
+        await message.answer("⚠️ У этого работника нет клиентов")
+        return await show_other_workers_menu(message, state)
+    
+    # Сохраняем ID работника в state
+    await state.update_data(other_worker_id=worker_id, other_worker_name=worker_name)
+    
+    kb = make_kb(clients_list, rows=3, back=True, skip=False)
+    fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id)
+    await fsm.set_state(Form.choosing_other_worker_client)
+    await message.answer(f"👤 <b>Клиенты работника {worker_name}:</b>", reply_markup=kb, parse_mode="HTML")
+
+@dp.message(Form.choosing_other_worker_client)
+async def process_other_worker_client(message: types.Message, state: FSMContext):
+    if message.text == "🔙 Назад":
+        return await show_other_workers_menu(message, state)
+    
+    data = await state.get_data()
+    other_worker_id = data.get('other_worker_id')
+    
+    # Сохраняем выбранного клиента и ID работника-владельца клиента
+    await state.update_data(
+        client=message.text,
+        client_owner_id=other_worker_id  # Запоминаем чей это клиент
+    )
     await check_edit_or_next(message, state, show_media_menu)
 
 async def show_media_menu(message):
@@ -683,7 +772,7 @@ async def process_custom_rating_text(message: types.Message, state: FSMContext):
 async def show_final_review(message: types.Message, state: FSMContext):
     await state.update_data(editing_mode=False)
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id); await fsm.set_state(Form.final_review); data = await state.get_data()
-    text = (f"📋 <b>ПРОВЕРКА (Вид для клиента):</b>\n\n👤 Client: {data.get('client')}\n🔢 Table: {data.get('table')}\n📱 Seller: {data.get('seller_number')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n🗣 Nego: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
+    text = (f"📋 <b>ПРОВЕРКА (Вид для клиента):</b>\n\n👤 Client: {data.get('client')}\n#S{data.get('table')}\n📱 Seller: {data.get('seller_number')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n🗣 Nego: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
     builder = InlineKeyboardBuilder(); builder.button(text="✏️ Изменить", callback_data="open_edit_menu"); builder.button(text="✅ ОТПРАВИТЬ МЕНЕДЖЕРУ", callback_data="send_final"); builder.adjust(1)
     msg = await message.answer("Загружаю анкету...", reply_markup=ReplyKeyboardRemove()); await msg.delete()
     media_files = data.get("media_files", [])
@@ -899,17 +988,20 @@ async def send_final(callback: types.CallbackQuery, state: FSMContext):
     data = await state.get_data(); user_id = callback.from_user.id
     anketa_id = db_get_next_id(user_id); worker_name = db_check_worker(user_id); client_tag = data.get('client')
     
-    target_client_id = get_client_id(user_id, client_tag)
+    # Проверяем, выбран ли клиент другого работника
+    client_owner_id = data.get('client_owner_id', user_id)  # Используем ID владельца клиента
+    
+    target_client_id = get_client_id(client_owner_id, client_tag)
     
     client_link_text = client_tag
     if target_client_id and isinstance(target_client_id, int):
         client_link_text = f'<a href="tg://user?id={target_client_id}">{client_tag}</a>'
 
-    manager_body = (f"🆔 <b>ID: {anketa_id}</b>\n👤 <b>От:</b> {worker_name}\n🏷 <b>Клиент:</b> {client_link_text}\n🔢 Table: {data.get('table')}\n📱 Seller: {data.get('seller_number')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n🗣 Nego: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
+    manager_body = (f"🆔 <b>ID: {anketa_id}</b>\n👤 <b>От:</b> {worker_name}\n🏷 <b>Клиент:</b> {client_link_text}\n#S{data.get('table')}\n📱 Seller: {data.get('seller_number')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n🗣 Nego: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
     manager_text_final = f"🟢 <b>Status: Available</b>\n\n{manager_body}"
 
-    public_text = (f"🟢 <b>Status: Available</b>\n\n🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono): €{data.get('chrono_price')}\n🗣 Nego: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}")
-    clean_text = (f"🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono): €{data.get('chrono_price')}\n🗣 Nego: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}")
+    public_text = (f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\nClient {client_tag}\n🆔 <b>ID: {anketa_id}</b>\n#S{data.get('table')}\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n🗣 Nego: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}")
+    clean_text = (f"👤 <b>{worker_name}</b>\nClient {client_tag}\n🆔 <b>ID: {anketa_id}</b>\n#S{data.get('table')}\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n🗣 Nego: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}")
 
     db_save_full_order(user_id, worker_name, anketa_id, data)
     lot_id = str(uuid.uuid4())[:8]
@@ -917,8 +1009,8 @@ async def send_final(callback: types.CallbackQuery, state: FSMContext):
     start_kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🔄 Новые часы")]], resize_keyboard=True)
     worker_msg = await callback.message.answer(f"✅ <b>Отправлено!</b>\n🆔 <b>ID: {anketa_id}</b>", reply_markup=start_kb, parse_mode="HTML")
 
-    # Получаем групповой чат для этого клиента
-    actual_chat_id = get_client_group_chat(user_id, client_tag)
+    # Получаем групповой чат для этого клиента (используем владельца клиента)
+    actual_chat_id = get_client_group_chat(client_owner_id, client_tag)
     
     _, chat_msg_id, chat_text_msg_id = await broadcast_to_channels(data.get("media_files"), public_text, lot_id, actual_chat_id)
 
