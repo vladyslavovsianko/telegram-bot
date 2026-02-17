@@ -968,6 +968,7 @@ async def delayed_channel_post(chat_id, media_files, text, buttons, lot_id):
             msgs = await bot.send_media_group(chat_id, media=channel_media_group)
             # Сохраняем ID ПОСЛЕДНЕГО сообщения (где caption)
             msg_id = msgs[-1].message_id
+            logging.info(f"📤 Отправлен альбом в канал: {len(msgs)} фото, последнее ID={msg_id}")
         else:
             # Одно медиа: подпись БЕЗ кнопок
             if media_files[0]['type'] == 'photo': 
@@ -975,11 +976,13 @@ async def delayed_channel_post(chat_id, media_files, text, buttons, lot_id):
             else: 
                 msg = await bot.send_video(chat_id, media_files[0]['id'], caption=text, parse_mode="HTML")
             msg_id = msg.message_id
+            logging.info(f"📤 Отправлено одно фото в канал: ID={msg_id}")
         
         # Обновляем кэш
         if lot_id in LOTS_CACHE:
             LOTS_CACHE[lot_id]['channel_msg_id'] = msg_id
             LOTS_CACHE[lot_id]['channel_text_msg_id'] = None  # Больше нет отдельного текста
+            logging.info(f"💾 Сохранен channel_msg_id={msg_id} для lot_id={lot_id}")
             
             # Обновляем кнопки менеджера с ссылкой на канал
             await update_manager_buttons_with_channel_link(lot_id, msg_id)
@@ -1259,9 +1262,12 @@ async def change_status_unified(callback: types.CallbackQuery):
     # Обновляем КАНАЛ (витрину)
     chan_msg_id = lot_data.get('channel_msg_id')
     
+    logging.info(f"🔍 Попытка обновить канал: TARGET_CHANNEL_ID={TARGET_CHANNEL_ID}, chan_msg_id={chan_msg_id}")
+    
     if TARGET_CHANNEL_ID != 0 and chan_msg_id:
         try:
             # Редактируем caption последнего фото в альбоме (где находится текст)
+            logging.info(f"🔄 Редактируем сообщение {chan_msg_id} в канале {TARGET_CHANNEL_ID}")
             await bot.edit_message_caption(
                 chat_id=TARGET_CHANNEL_ID, 
                 message_id=chan_msg_id, 
@@ -1271,6 +1277,8 @@ async def change_status_unified(callback: types.CallbackQuery):
             logging.info(f"✅ Статус обновлен в канале")
         except Exception as e:
             logging.error(f"❌ Ошибка обновления канала: {e}")
+    else:
+        logging.warning(f"⚠️ Пропуск обновления канала: TARGET_CHANNEL_ID={TARGET_CHANNEL_ID}, chan_msg_id={chan_msg_id}")
 
     # Обновляем ГРУППОВОЙ ЧАТ
     worker_id = lot_data.get('user_id')
