@@ -605,6 +605,9 @@ async def back_to_client(message: types.Message, state: FSMContext):
 async def start_calculator(message: types.Message, state: FSMContext, target_state, title, allow_skip=True):
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id)
     await fsm.set_state(target_state)
+    # Убираем предыдущие кнопки
+    temp_msg = await message.answer("⏳", reply_markup=ReplyKeyboardRemove())
+    await temp_msg.delete()
     calc_msg = await message.answer(f"{title}\n\n💡 <i>Введите число с клавиатуры</i>", reply_markup=get_calc_control_buttons(show_skip=allow_skip), parse_mode="HTML")
     await state.update_data(calc_title=title, calc_allow_skip=allow_skip, calc_msg_id=calc_msg.message_id)
 
@@ -712,9 +715,9 @@ async def process_text_input(message: types.Message, state: FSMContext):
         await check_edit_or_next(message, state, show_kit_menu)
 
 async def show_negotiation_menu(message):
-    kb = make_kb(["⛔️ Без торга", "🤝 Есть потенциал"], rows=2, back=True, skip=True)
+    kb = make_kb(["✅ Да", "❌ Нет"], rows=2, back=True, skip=True)
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id)
-    await fsm.set_state(Form.choosing_negotiation); await bot.send_message(message.chat.id, "6️⃣ <b>Торг:</b>", reply_markup=kb, parse_mode="HTML")
+    await fsm.set_state(Form.choosing_negotiation); await bot.send_message(message.chat.id, "6️⃣ <b>Скидка:</b>", reply_markup=kb, parse_mode="HTML")
 
 @dp.message(Form.choosing_negotiation)
 async def process_negotiation(message: types.Message, state: FSMContext):
@@ -725,8 +728,8 @@ async def process_negotiation(message: types.Message, state: FSMContext):
         return await start_calculator(message, state, Form.entering_chrono_price, "5️⃣ <b>Цена CHRONO24:</b>", allow_skip=True)
     val = message.text
     if message.text == "⏩ Пропустить": val = "—"
-    elif message.text == "⛔️ Без торга": val = "Fixed price"
-    elif message.text == "🤝 Есть потенциал": val = "Negotiable"
+    elif message.text == "✅ Да": val = "Yes"
+    elif message.text == "❌ Нет": val = "No"
     await state.update_data(negotiation=val); await check_edit_or_next(message, state, show_year_menu)
 
 async def show_year_menu(message):
@@ -788,7 +791,7 @@ async def process_kit(message: types.Message, state: FSMContext):
     await state.update_data(kit=val); await check_edit_or_next(message, state, show_condition_menu)
 
 async def show_condition_menu(message):
-    kb = make_kb(["✨ Новые в пленках", "💎 Отличное", "👌 Хорошее", "🤏 Носились, без критических", "🧹 Под полировку", "💀 Плохое"], rows=2, back=True, skip=True)
+    kb = make_kb(["🆕 Новые", "💎 Отличное", "👌 Хорошее", "📦 Удовлетворительное", "💀 Плохое"], rows=2, back=True, skip=True)
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id); await fsm.set_state(Form.choosing_condition); await bot.send_message(message.chat.id, "1️⃣1️⃣ <b>Состояние:</b>", reply_markup=kb, parse_mode="HTML")
 
 @dp.message(Form.choosing_condition)
@@ -798,8 +801,14 @@ async def process_condition(message: types.Message, state: FSMContext):
         if data.get("editing_mode"):
             return await show_final_review(message, state)
         return await show_kit_menu(message)
-    val = "—" if message.text == "⏩ Пропустить" else ("New / Unworn" if "Новые" in message.text else ("Excellent" if "Отличное" in message.text else ("Good" if "Хорошее" in message.text else ("Worn (no major damage)" if "Носились" in message.text else ("Needs polishing" if "полировку" in message.text else ("Poor" if "Плохое" in message.text else message.text))))))
-    await state.update_data(condition=val, seller_name="—"); await check_edit_or_next(message, state, lambda m: start_calculator(m, state, Form.entering_seller_number, "📱 <b>Введи НОМЕР продавца:</b>", allow_skip=True))
+    val = message.text
+    if message.text == "⏩ Пропустить": val = "—"
+    elif message.text == "🆕 Новые": val = "New"
+    elif message.text == "💎 Отличное": val = "Excellent"
+    elif message.text == "👌 Хорошее": val = "Good"
+    elif message.text == "📦 Удовлетворительное": val = "satisfactory"
+    elif message.text == "💀 Плохое": val = "Poor"
+    await state.update_data(condition=val); await check_edit_or_next(message, state, lambda m: start_calculator(m, state, Form.entering_seller_number, "📱 <b>Введи НОМЕР продавца:</b>", allow_skip=True))
 
 async def ask_seller_name(message):
     kb = make_kb([], rows=1, back=True, skip=True)
@@ -812,7 +821,7 @@ async def process_seller_name(message: types.Message, state: FSMContext):
     await state.update_data(seller_name=val); await check_edit_or_next(message, state, lambda m: start_calculator(m, state, Form.entering_seller_number, "📱 <b>Введи НОМЕР продавца:</b>", allow_skip=True))
 
 async def show_worker_rating_menu(message):
-    kb = make_kb(["🔥 Сильный вариант, рекомендую", "👍 Можно брать", "⚠️ Есть нюансы", "🤔 Под вопросом", "❌ Не рекомендую"], rows=1, back=True, skip=True, manual_text="💬 Свой комментарий")
+    kb = make_kb(["✅ Рекомендую", "👌 Нормально", "❌ Не рекомендую"], rows=3, back=True, skip=True)
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id); await fsm.set_state(Form.choosing_worker_rating); await bot.send_message(message.chat.id, "1️⃣2️⃣ <b>Твоя оценка (для менеджера):</b>", reply_markup=kb, parse_mode="HTML")
 
 @dp.message(Form.choosing_worker_rating)
@@ -822,13 +831,12 @@ async def process_rating(message: types.Message, state: FSMContext):
         if data.get("editing_mode"):
             return await show_final_review(message, state)
         return await start_calculator(message, state, Form.entering_seller_number, "📱 <b>Введи НОМЕР продавца:</b>", allow_skip=True)
-    if message.text == "💬 Свой комментарий": await state.set_state(Form.entering_custom_rating); await message.answer("✍️ <b>Напиши комментарий:</b>", reply_markup=ReplyKeyboardRemove(), parse_mode="HTML"); return
-    val = "—" if message.text == "⏩ Пропустить" else ("🔥 Highly recommended" if "Сильный" in message.text else ("👍 Good option" if "Можно" in message.text else ("⚠️ Has nuances" if "нюансы" in message.text else ("🤔 Questionable" if "вопросом" in message.text else ("❌ Not recommended" if "Не" in message.text else message.text)))))
+    val = message.text
+    if message.text == "⏩ Пропустить": val = "—"
+    elif message.text == "✅ Рекомендую": val = "✅ Recommended"
+    elif message.text == "👌 Нормально": val = "👌 OK"
+    elif message.text == "❌ Не рекомендую": val = "❌ Not recommended"
     await state.update_data(rating=val); await show_final_review(message, state)
-
-@dp.message(Form.entering_custom_rating)
-async def process_custom_rating_text(message: types.Message, state: FSMContext):
-    await state.update_data(rating=f"💬 {message.text}"); await show_final_review(message, state)
 
 # ==========================================
 # 8. ПРОВЕРКА И ОТПРАВКА
@@ -837,7 +845,7 @@ async def process_custom_rating_text(message: types.Message, state: FSMContext):
 async def show_final_review(message: types.Message, state: FSMContext):
     await state.update_data(editing_mode=False)
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id); await fsm.set_state(Form.final_review); data = await state.get_data()
-    text = (f"📋 <b>ПРОВЕРКА (Вид для клиента):</b>\n\n👤 Client: {data.get('client')}\nS{data.get('table')}\n📱 Seller: {data.get('seller_number')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n🗣 Nego: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
+    text = (f"📋 <b>ПРОВЕРКА (Вид для клиента):</b>\n\n👤 Client: {data.get('client')} - {data.get('table')}\n📱 Seller: {data.get('seller_number')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n💰 Скидка: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
     builder = InlineKeyboardBuilder(); builder.button(text="✏️ Изменить", callback_data="open_edit_menu"); builder.button(text="✅ ОТПРАВИТЬ МЕНЕДЖЕРУ", callback_data="send_final"); builder.adjust(1)
     msg = await message.answer("Загружаю анкету...", reply_markup=ReplyKeyboardRemove()); await msg.delete()
     media_files = data.get("media_files", [])
@@ -1122,7 +1130,7 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
     first_client_tag = multi_clients[0]
     target_client_id = get_client_id(client_owner_id, first_client_tag)
     
-    clean_text = (f"👤 <b>{worker_name}</b>\nClient {first_client_tag}\n🆔 <b>ID: {anketa_id}</b>\nS{data.get('table')}\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n🗣 Nego: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=6776561610\">Связаться с менеджером</a>")
+    clean_text = (f"👤 <b>{worker_name}</b>\nClient {first_client_tag}-{data.get('table')}\n🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n💰 Скидка: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=6776561610\">Contact Manager</a>")
     
     # Отправляем в каждый чат клиента
     first_chat_msg_id = None
@@ -1133,7 +1141,7 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
         # Получаем групповой чат для каждого клиента
         actual_chat_id = get_client_group_chat(client_owner_id, client_tag)
         
-        public_text = (f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\nClient {client_tag}\n🆔 <b>ID: {anketa_id}</b>\nS{data.get('table')}\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n🗣 Nego: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=6776561610\">Связаться с менеджером</a>")
+        public_text = (f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\nClient {client_tag}-{data.get('table')}\n🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n💰 Скидка: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=6776561610\">Contact Manager</a>")
         
         try:
             # Используем main_lot_id только для ПЕРВОГО клиента (для канала), остальным отправляем только в чат
@@ -1150,7 +1158,7 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
             logging.error(f"❌ Ошибка отправки {client_tag}: {e}")
     
     # Отправляем менеджеру сводку
-    manager_body = (f"🆔 <b>ID: {anketa_id}</b>\n👤 <b>От:</b> {worker_name}\n🏷 <b>Клиенты:</b> {clients_display}\nS{data.get('table')}\n📱 Seller: {data.get('seller_number')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n🗣 Nego: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
+    manager_body = (f"🆔 <b>ID: {anketa_id}</b>\n👤 <b>От:</b> {worker_name}\n🏷 <b>Клиенты:</b> {clients_display}\n📱 Seller: {data.get('seller_number')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n💰 Скидка: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
     manager_text_final = f"🟢 <b>Status: Available</b>\n\n{manager_body}\n\n📤 <b>Отправлено {len(multi_clients)} клиентам</b>"
     
     # Генерируем ссылку на первый групповой чат
@@ -1246,11 +1254,11 @@ async def send_to_single_client(callback, state, user_id, worker_name, anketa_id
     if target_client_id and isinstance(target_client_id, int):
         client_link_text = f'<a href="tg://user?id={target_client_id}">{client_tag}</a>'
 
-    manager_body = (f"🆔 <b>ID: {anketa_id}</b>\n👤 <b>От:</b> {worker_name}\n🏷 <b>Клиент:</b> {client_link_text}\nS{data.get('table')}\n📱 Seller: {data.get('seller_number')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n🗣 Nego: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
+    manager_body = (f"🆔 <b>ID: {anketa_id}</b>\n👤 <b>От:</b> {worker_name}\n🏷 <b>Клиент:</b> {client_link_text}-{data.get('table')}\n📱 Seller: {data.get('seller_number')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n💰 Скидка: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
     manager_text_final = f"🟢 <b>Status: Available</b>\n\n{manager_body}"
 
-    public_text = (f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\nClient {client_tag}\n🆔 <b>ID: {anketa_id}</b>\nS{data.get('table')}\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n🗣 Nego: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=6776561610\">Связаться с менеджером</a>")
-    clean_text = (f"👤 <b>{worker_name}</b>\nClient {client_tag}\n🆔 <b>ID: {anketa_id}</b>\nS{data.get('table')}\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n🗣 Nego: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=6776561610\">Связаться с менеджером</a>")
+    public_text = (f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\nClient {client_tag}-{data.get('table')}\n🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n💰 Скидка: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=6776561610\">Contact Manager</a>")
+    clean_text = (f"👤 <b>{worker_name}</b>\nClient {client_tag}-{data.get('table')}\n🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n💰 Скидка: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=6776561610\">Contact Manager</a>")
 
     db_save_full_order(user_id, worker_name, anketa_id, data)
     lot_id = str(uuid.uuid4())[:8]
