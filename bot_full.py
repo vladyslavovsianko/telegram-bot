@@ -378,6 +378,21 @@ def get_calc_control_buttons(show_skip=True):
     builder.adjust(2 if show_skip else 1)
     return builder.as_markup()
 
+def make_chat_link(chat_id, msg_id=None):
+    """Генерирует ссылку на групповой чат Telegram"""
+    if not chat_id:
+        return None
+    cid = str(chat_id)
+    # Убираем -100 префикс (старый формат: -1001234567890)
+    if cid.startswith("-100"):
+        clean = cid[4:]
+    else:
+        # Новый формат: -5069461222 → просто убираем минус
+        clean = cid.lstrip("-")
+    if msg_id:
+        return f"https://t.me/c/{clean}/{msg_id}"
+    return f"https://t.me/c/{clean}"
+
 def get_channel_status_kb(lot_id):
     builder = InlineKeyboardBuilder()
     builder.row(
@@ -1050,16 +1065,13 @@ async def update_manager_buttons_with_channel_link(lot_id, channel_msg_id):
         
         # Ссылка на групповой чат
         actual_chat_id = get_client_group_chat(user_id, client_tag) if user_id and client_tag else None
-        chat_link = None
-        if actual_chat_id and chat_msg_id:
-            clean_id = str(actual_chat_id).replace("-100", "").replace("-", "")
-            chat_link = f"https://t.me/c/{clean_id}/{chat_msg_id}"
-        
+        chat_link = make_chat_link(actual_chat_id, chat_msg_id)
+    
         # Пересоздаем кнопки
         mgr_kb = InlineKeyboardBuilder()
         
         if chat_link: 
-            mgr_kb.button(text="💬 Пост в группе", url=chat_link)
+            mgr_kb.button(text="🔗 Ссылка на чат", url=chat_link)
         
         mgr_kb.button(text="📹 Запросить видео", callback_data=f"req_video_{lot_id}")
         mgr_kb.button(text="✅ БЕРУТ", callback_data=f"client_buy_{lot_id}")
@@ -1156,16 +1168,13 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
     
     # Генерируем ссылку на первый групповой чат
     actual_chat_id = get_client_group_chat(client_owner_id, first_client_tag)
-    chat_link = None
-    if actual_chat_id and first_chat_msg_id:
-        clean_id = str(actual_chat_id).replace("-100", "").replace("-", "")
-        chat_link = f"https://t.me/c/{clean_id}/{first_chat_msg_id}"
+    chat_link = make_chat_link(actual_chat_id, first_chat_msg_id)
     
     # Создаем кнопки для менеджера
     mgr_kb = InlineKeyboardBuilder()
     
     if chat_link: 
-        mgr_kb.button(text="💬 Пост в группе", url=chat_link)
+        mgr_kb.button(text="🔗 Ссылка на чат", url=chat_link)
     
     mgr_kb.button(text="📹 Запросить видео", callback_data=f"req_video_{main_lot_id}")
     mgr_kb.button(text="✅ БЕРУТ", callback_data=f"client_buy_{main_lot_id}")
@@ -1255,18 +1264,14 @@ async def send_to_single_client(callback, state, user_id, worker_name, anketa_id
     
     _, chat_msg_id, chat_text_msg_id = await broadcast_to_channels(data.get("media_files"), public_text, lot_id, actual_chat_id)
 
-    # ГЕНЕРАЦИЯ ССЫЛКИ НА ПОСТ В ГРУППЕ
-    chat_link = None
-    if actual_chat_id and chat_msg_id:
-        clean_id = str(actual_chat_id).replace("-100", "").replace("-", "")
-        chat_link = f"https://t.me/c/{clean_id}/{chat_msg_id}"
+    # ГЕНЕРАЦИЯ ССЫЛКИ НА ЧАТ
+    chat_link = make_chat_link(actual_chat_id, chat_msg_id)
 
     # СБОРКА КНОПОК ДЛЯ МЕНЕДЖЕРА
     mgr_kb = InlineKeyboardBuilder()
     
-    # КНОПКА НА ПОСТ В ГРУППЕ
     if chat_link: 
-        mgr_kb.button(text="💬 Пост в группе", url=chat_link)
+        mgr_kb.button(text="🔗 Ссылка на чат", url=chat_link)
     
     mgr_kb.button(text="📹 Запросить видео", callback_data=f"req_video_{lot_id}")
     mgr_kb.button(text="✅ БЕРУТ", callback_data=f"client_buy_{lot_id}")
@@ -1448,14 +1453,11 @@ async def change_status_unified(callback: types.CallbackQuery):
     # Получаем ссылку на пост в группе
     chat_msg_id = lot_data.get('chat_msg_id')
     actual_chat_id = get_client_group_chat(worker_id, client_tag) if worker_id and client_tag else target_client_id
-    chat_link = None
-    if actual_chat_id and chat_msg_id:
-        clean_id = str(actual_chat_id).replace("-100", "").replace("-", "")
-        chat_link = f"https://t.me/c/{clean_id}/{chat_msg_id}"
+    chat_link = make_chat_link(actual_chat_id, chat_msg_id)
     
     mgr_kb = InlineKeyboardBuilder()
     
-    if chat_link: mgr_kb.button(text="🔗 Пост в группе", url=chat_link)
+    if chat_link: mgr_kb.button(text="🔗 Ссылка на чат", url=chat_link)
     
     mgr_kb.button(text="📹 Запросить видео", callback_data=f"req_video_{lot_id}")
     mgr_kb.button(text="✅ БЕРУТ", callback_data=f"client_buy_{lot_id}")
