@@ -1057,16 +1057,9 @@ async def update_manager_buttons_with_channel_link(lot_id, channel_msg_id):
         
         # Пересоздаем кнопки
         mgr_kb = InlineKeyboardBuilder()
-        if target_client_id: 
-            mgr_kb.button(text=f"🚀 Клиенту ({client_tag})", callback_data=f"sendto_client_{lot_id}")
-        else: 
-            mgr_kb.button(text="⚠️ Нет контакта", callback_data=f"clean_text_{lot_id}")
         
         if chat_link: 
             mgr_kb.button(text="💬 Пост в группе", url=chat_link)
-        
-        # Кнопка на канал (теперь с ссылкой!)
-        mgr_kb.button(text="📢 Пост в канале", url=channel_link)
         
         mgr_kb.button(text="📹 Запросить видео", callback_data=f"req_video_{lot_id}")
         mgr_kb.button(text="✅ БЕРУТ", callback_data=f"client_buy_{lot_id}")
@@ -1170,16 +1163,9 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
     
     # Создаем кнопки для менеджера
     mgr_kb = InlineKeyboardBuilder()
-    if target_client_id: 
-        mgr_kb.button(text=f"🚀 Клиенту ({first_client_tag})", callback_data=f"sendto_client_{main_lot_id}")
-    else: 
-        mgr_kb.button(text="⚠️ Нет контакта", callback_data=f"clean_text_{main_lot_id}")
     
     if chat_link: 
         mgr_kb.button(text="💬 Пост в группе", url=chat_link)
-    
-    if TARGET_CHANNEL_ID != 0:
-        mgr_kb.button(text="📢 Пост в канале ⏳", callback_data=f"wait_channel_{main_lot_id}")
     
     mgr_kb.button(text="📹 Запросить видео", callback_data=f"req_video_{main_lot_id}")
     mgr_kb.button(text="✅ БЕРУТ", callback_data=f"client_buy_{main_lot_id}")
@@ -1277,18 +1263,10 @@ async def send_to_single_client(callback, state, user_id, worker_name, anketa_id
 
     # СБОРКА КНОПОК ДЛЯ МЕНЕДЖЕРА
     mgr_kb = InlineKeyboardBuilder()
-    if target_client_id: 
-        mgr_kb.button(text=f"🚀 Клиенту ({client_tag})", callback_data=f"sendto_client_{lot_id}")
-    else: 
-        mgr_kb.button(text="⚠️ Нет контакта", callback_data=f"clean_text_{lot_id}")
     
     # КНОПКА НА ПОСТ В ГРУППЕ
     if chat_link: 
         mgr_kb.button(text="💬 Пост в группе", url=chat_link)
-    
-    # КНОПКА НА КАНАЛ (будет обновлена после отправки поста)
-    if TARGET_CHANNEL_ID != 0:
-        mgr_kb.button(text="📢 Пост в канале ⏳", callback_data=f"wait_channel_{lot_id}")
     
     mgr_kb.button(text="📹 Запросить видео", callback_data=f"req_video_{lot_id}")
     mgr_kb.button(text="✅ БЕРУТ", callback_data=f"client_buy_{lot_id}")
@@ -1476,10 +1454,6 @@ async def change_status_unified(callback: types.CallbackQuery):
         chat_link = f"https://t.me/c/{clean_id}/{chat_msg_id}"
     
     mgr_kb = InlineKeyboardBuilder()
-    if target_client_id: 
-        mgr_kb.button(text=f"🚀 Клиенту ({client_tag})", callback_data=f"sendto_client_{lot_id}")
-    else: 
-        mgr_kb.button(text="⚠️ Нет контакта", callback_data=f"clean_text_{lot_id}")
     
     if chat_link: mgr_kb.button(text="🔗 Пост в группе", url=chat_link)
     
@@ -1573,8 +1547,16 @@ async def fwd_vid(c: types.CallbackQuery):
     if not actual_chat_id: return await c.answer("Чат не найден", show_alert=True)
     
     await c.answer("⏳...")
+    # Извлекаем ID анкеты из clean_text
+    clean_text = ld.get('clean_text', '')
+    anketa_line = ""
+    for line in clean_text.split('\n'):
+        if '🆔' in line:
+            anketa_line = line
+            break
+    video_caption = f"📹 {anketa_line}" if anketa_line else "📹"
     try:
-        await bot.send_video(actual_chat_id, c.message.video.file_id, caption="📹")
+        await bot.send_video(actual_chat_id, c.message.video.file_id, caption=video_caption, parse_mode="HTML")
         await c.message.answer(f"✅ Видео отправлено в чат {client_tag}!")
     except Exception as e:
         await c.message.answer(f"❌ Ошибка: {e}")
