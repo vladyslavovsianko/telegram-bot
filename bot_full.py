@@ -49,153 +49,153 @@ API_HASH = os.getenv("API_HASH", "")
 EMPLOYEES_CONFIG = {
     12313213131321: { 
         "clients": {
-            "#Test": {"client_id": 12312213131321, "group_chat_id": -5069461222},
-            "#1": {"client_id": 0, "group_chat_id": -5069461222},
-            "#2": {"client_id": 0, "group_chat_id": -5069461222},
-            "#3": {"client_id": 0, "group_chat_id": -5069461222},
-            "#4": {"client_id": 0, "group_chat_id": -5069461222},
-            "#5": {"client_id": 0, "group_chat_id": -5069461222},
-            "#6": {"client_id": 0, "group_chat_id": -5069461222},
-            "#7": {"client_id": 0, "group_chat_id": -5069461222},
-            "#8": {"client_id": 0, "group_chat_id": -5069461222},
-            "#9": {"client_id": 0, "group_chat_id": -5069461222},
-            "#10": {"client_id": 0, "group_chat_id": -5069461222},
-            "#11": {"client_id": 0, "group_chat_id": -5069461222},
-            "#12": {"client_id": 0, "group_chat_id": -5069461222},
-            "#13": {"client_id": 0, "group_chat_id": -5069461222},
-            "#14": {"client_id": 0, "group_chat_id": -5069461222},
-            "#15": {"client_id": 0, "group_chat_id": -5069461222},
-            "#16": {"client_id": 0, "group_chat_id": -5069461222},
-            "#17": {"client_id": 0, "group_chat_id": -5069461222},
-            "#18": {"client_id": 0, "group_chat_id": -5069461222},
-            "#19": {"client_id": 0, "group_chat_id": -5069461222},
-            "#20": {"client_id": 0, "group_chat_id": -5069461222}
+            "#Test": {"group_chat_id": -5069461222},
+            "#1": {"group_chat_id": -5069461222},
+            "#2": {"group_chat_id": -5069461222},
+            "#3": {"group_chat_id": -5069461222},
+            "#4": {"group_chat_id": -5069461222},
+            "#5": {"group_chat_id": -5069461222},
+            "#6": {"group_chat_id": -5069461222},
+            "#7": {"group_chat_id": -5069461222},
+            "#8": {"group_chat_id": -5069461222},
+            "#9": {"group_chat_id": -5069461222},
+            "#10": {"group_chat_id": -5069461222},
+            "#11": {"group_chat_id": -5069461222},
+            "#12": {"group_chat_id": -5069461222},
+            "#13": {"group_chat_id": -5069461222},
+            "#14": {"group_chat_id": -5069461222},
+            "#15": {"group_chat_id": -5069461222},
+            "#16": {"group_chat_id": -5069461222},
+            "#17": {"group_chat_id": -5069461222},
+            "#18": {"group_chat_id": -5069461222},
+            "#19": {"group_chat_id": -5069461222},
+            "#20": {"group_chat_id": -5069461222}
         } 
     },
     610220736: { 
         "clients": { 
             "#VIP_Chat": {"client_id": 610220736, "group_chat_id": -1003745353210},
-            "#1": {"client_id": 0, "group_chat_id": -5182586637},
-            "#2": {"client_id": 0, "group_chat_id": -5105834721},
-            "#3": {"client_id": 0, "group_chat_id": -5029226279},
-            "#4": {"client_id": 0, "group_chat_id": -5069461222},
-            "#5": {"client_id": 0, "group_chat_id": -5069461222},
-            "#6": {"client_id": 0, "group_chat_id": -5069461222},
-            "#7": {"client_id": 0, "group_chat_id": -5069461222},
-            "#8": {"client_id": 0, "group_chat_id": -5069461222},
-            "#9": {"client_id": 0, "group_chat_id": -5069461222},
-            "#10": {"client_id": 0, "group_chat_id": -5069461222},
-            "#11": {"client_id": 0, "group_chat_id": -5069461222},
-            "#12": {"client_id": 0, "group_chat_id": -5069461222},
-            "#13": {"client_id": 0, "group_chat_id": -5069461222},
-            "#14": {"client_id": 0, "group_chat_id": -5069461222},
-            "#15": {"client_id": 0, "group_chat_id": -5069461222},
-            "#16": {"client_id": 0, "group_chat_id": -5069461222},
-            "#17": {"client_id": 0, "group_chat_id": -5069461222},
-            "#18": {"client_id": 0, "group_chat_id": -5069461222},
-            "#19": {"client_id": 0, "group_chat_id": -5069461222},
-            "#20": {"client_id": 0, "group_chat_id": -5069461222},
-            "#136": {"client_id": 0, "group_chat_id": -5295466035}
+            "#1": {"group_chat_id": -5182586637},
+            "#2": {"group_chat_id": -5105834721},
+            "#3": {"group_chat_id": -5029226279},
+            "#4": {"group_chat_id": -5069461222},
+            "#5": {"group_chat_id": -5069461222},
+            "#6": {"group_chat_id": -5069461222},
+            "#7": {"group_chat_id": -5069461222},
+            "#8": {"group_chat_id": -5069461222},
+            "#9": {"group_chat_id": -5069461222},
+            "#10": {"group_chat_id": -5069461222},
+            "#11": {"group_chat_id": -5069461222},
+            "#12": {"group_chat_id": -5069461222},
+            "#13": {"group_chat_id": -5069461222},
+            "#14": {"group_chat_id": -5069461222},
+            "#15": {"group_chat_id": -5069461222},
+            "#16": {"group_chat_id": -5069461222},
+            "#17": {"group_chat_id": -5069461222},
+            "#18": {"group_chat_id": -5069461222},
+            "#19": {"group_chat_id": -5069461222},
+            "#20": {"group_chat_id": -5069461222},
+            "#136": {"group_chat_id": -5295466035}
         } 
     },
     645070075: { 
         "clients": { 
             "#Moscow": {"client_id": 7948650630, "group_chat_id": -5069461222},
-            "#1": {"client_id": 0, "group_chat_id": -5069461222},
-            "#2": {"client_id": 0, "group_chat_id": -5069461222},
-            "#3": {"client_id": 0, "group_chat_id": -5069461222},
-            "#136": {"client_id": 0, "group_chat_id": -5295466035},
-            "#5": {"client_id": 0, "group_chat_id": -5069461222},
-            "#6": {"client_id": 0, "group_chat_id": -5069461222},
-            "#7": {"client_id": 0, "group_chat_id": -5069461222},
-            "#8": {"client_id": 0, "group_chat_id": -5069461222},
-            "#9": {"client_id": 0, "group_chat_id": -5069461222},
-            "#10": {"client_id": 0, "group_chat_id": -5069461222},
-            "#11": {"client_id": 0, "group_chat_id": -5069461222},
-            "#12": {"client_id": 0, "group_chat_id": -5069461222},
-            "#13": {"client_id": 0, "group_chat_id": -5069461222},
-            "#14": {"client_id": 0, "group_chat_id": -5069461222},
-            "#15": {"client_id": 0, "group_chat_id": -5069461222},
-            "#16": {"client_id": 0, "group_chat_id": -5069461222},
-            "#17": {"client_id": 0, "group_chat_id": -5069461222},
-            "#18": {"client_id": 0, "group_chat_id": -5069461222},
-            "#19": {"client_id": 0, "group_chat_id": -5069461222},
-            "#20": {"client_id": 0, "group_chat_id": -5069461222}
+            "#1": {"group_chat_id": -5069461222},
+            "#2": {"group_chat_id": -5069461222},
+            "#3": {"group_chat_id": -5069461222},
+            "#136": {"group_chat_id": -5295466035},
+            "#5": {"group_chat_id": -5069461222},
+            "#6": {"group_chat_id": -5069461222},
+            "#7": {"group_chat_id": -5069461222},
+            "#8": {"group_chat_id": -5069461222},
+            "#9": {"group_chat_id": -5069461222},
+            "#10": {"group_chat_id": -5069461222},
+            "#11": {"group_chat_id": -5069461222},
+            "#12": {"group_chat_id": -5069461222},
+            "#13": {"group_chat_id": -5069461222},
+            "#14": {"group_chat_id": -5069461222},
+            "#15": {"group_chat_id": -5069461222},
+            "#16": {"group_chat_id": -5069461222},
+            "#17": {"group_chat_id": -5069461222},
+            "#18": {"group_chat_id": -5069461222},
+            "#19": {"group_chat_id": -5069461222},
+            "#20": {"group_chat_id": -5069461222}
         } 
     },
     625971673: {  # Виталий
         "clients": {
             "#Moscow": {"client_id": 7948650630, "group_chat_id": -5069461222},
-            "#1": {"client_id": 0, "group_chat_id": -5069461222},
-            "#2": {"client_id": 0, "group_chat_id": -5069461222},
-            "#3": {"client_id": 0, "group_chat_id": -5069461222},
-            "#4": {"client_id": 0, "group_chat_id": -5069461222},
-            "#5": {"client_id": 0, "group_chat_id": -5069461222},
-            "#6": {"client_id": 0, "group_chat_id": -5069461222},
-            "#7": {"client_id": 0, "group_chat_id": -5069461222},
-            "#8": {"client_id": 0, "group_chat_id": -5069461222},
-            "#9": {"client_id": 0, "group_chat_id": -5069461222},
-            "#10": {"client_id": 0, "group_chat_id": -5069461222},
-            "#11": {"client_id": 0, "group_chat_id": -5069461222},
-            "#12": {"client_id": 0, "group_chat_id": -5069461222},
-            "#13": {"client_id": 0, "group_chat_id": -5069461222},
-            "#14": {"client_id": 0, "group_chat_id": -5069461222},
-            "#15": {"client_id": 0, "group_chat_id": -5069461222},
-            "#16": {"client_id": 0, "group_chat_id": -5069461222},
-            "#17": {"client_id": 0, "group_chat_id": -5069461222},
-            "#18": {"client_id": 0, "group_chat_id": -5069461222},
-            "#19": {"client_id": 0, "group_chat_id": -5069461222},
-            "#20": {"client_id": 0, "group_chat_id": -5069461222}
+            "#1": {"group_chat_id": -5069461222},
+            "#2": {"group_chat_id": -5069461222},
+            "#3": {"group_chat_id": -5069461222},
+            "#4": {"group_chat_id": -5069461222},
+            "#5": {"group_chat_id": -5069461222},
+            "#6": {"group_chat_id": -5069461222},
+            "#7": {"group_chat_id": -5069461222},
+            "#8": {"group_chat_id": -5069461222},
+            "#9": {"group_chat_id": -5069461222},
+            "#10": {"group_chat_id": -5069461222},
+            "#11": {"group_chat_id": -5069461222},
+            "#12": {"group_chat_id": -5069461222},
+            "#13": {"group_chat_id": -5069461222},
+            "#14": {"group_chat_id": -5069461222},
+            "#15": {"group_chat_id": -5069461222},
+            "#16": {"group_chat_id": -5069461222},
+            "#17": {"group_chat_id": -5069461222},
+            "#18": {"group_chat_id": -5069461222},
+            "#19": {"group_chat_id": -5069461222},
+            "#20": {"group_chat_id": -5069461222}
         }
     },
     5442618444: {  # Миша
         "clients": {
             "#Moscow": {"client_id": 7948650630, "group_chat_id": -5069461222},
-            "#1": {"client_id": 0, "group_chat_id": -5069461222},
-            "#2": {"client_id": 0, "group_chat_id": -5069461222},
-            "#3": {"client_id": 0, "group_chat_id": -5069461222},
-            "#4": {"client_id": 0, "group_chat_id": -5069461222},
-            "#5": {"client_id": 0, "group_chat_id": -5069461222},
-            "#6": {"client_id": 0, "group_chat_id": -5069461222},
-            "#7": {"client_id": 0, "group_chat_id": -5069461222},
-            "#8": {"client_id": 0, "group_chat_id": -5069461222},
-            "#9": {"client_id": 0, "group_chat_id": -5069461222},
-            "#10": {"client_id": 0, "group_chat_id": -5069461222},
-            "#11": {"client_id": 0, "group_chat_id": -5069461222},
-            "#12": {"client_id": 0, "group_chat_id": -5069461222},
-            "#13": {"client_id": 0, "group_chat_id": -5069461222},
-            "#14": {"client_id": 0, "group_chat_id": -5069461222},
-            "#15": {"client_id": 0, "group_chat_id": -5069461222},
-            "#16": {"client_id": 0, "group_chat_id": -5069461222},
-            "#17": {"client_id": 0, "group_chat_id": -5069461222},
-            "#18": {"client_id": 0, "group_chat_id": -5069461222},
-            "#19": {"client_id": 0, "group_chat_id": -5069461222},
-            "#20": {"client_id": 0, "group_chat_id": -5069461222}
+            "#1": {"group_chat_id": -5069461222},
+            "#2": {"group_chat_id": -5069461222},
+            "#3": {"group_chat_id": -5069461222},
+            "#4": {"group_chat_id": -5069461222},
+            "#5": {"group_chat_id": -5069461222},
+            "#6": {"group_chat_id": -5069461222},
+            "#7": {"group_chat_id": -5069461222},
+            "#8": {"group_chat_id": -5069461222},
+            "#9": {"group_chat_id": -5069461222},
+            "#10": {"group_chat_id": -5069461222},
+            "#11": {"group_chat_id": -5069461222},
+            "#12": {"group_chat_id": -5069461222},
+            "#13": {"group_chat_id": -5069461222},
+            "#14": {"group_chat_id": -5069461222},
+            "#15": {"group_chat_id": -5069461222},
+            "#16": {"group_chat_id": -5069461222},
+            "#17": {"group_chat_id": -5069461222},
+            "#18": {"group_chat_id": -5069461222},
+            "#19": {"group_chat_id": -5069461222},
+            "#20": {"group_chat_id": -5069461222}
         }
     },
     419890021: {  # Олег
         "clients": {
             "#Moscow": {"client_id": 7948650630, "group_chat_id": -5069461222},
-            "#1": {"client_id": 0, "group_chat_id": -5069461222},
-            "#2": {"client_id": 0, "group_chat_id": -5069461222},
-            "#3": {"client_id": 0, "group_chat_id": -5069461222},
-            "#4": {"client_id": 0, "group_chat_id": -5069461222},
-            "#5": {"client_id": 0, "group_chat_id": -5069461222},
-            "#6": {"client_id": 0, "group_chat_id": -5069461222},
-            "#7": {"client_id": 0, "group_chat_id": -5069461222},
-            "#8": {"client_id": 0, "group_chat_id": -5069461222},
-            "#9": {"client_id": 0, "group_chat_id": -5069461222},
-            "#10": {"client_id": 0, "group_chat_id": -5069461222},
-            "#11": {"client_id": 0, "group_chat_id": -5069461222},
-            "#12": {"client_id": 0, "group_chat_id": -5069461222},
-            "#13": {"client_id": 0, "group_chat_id": -5069461222},
-            "#14": {"client_id": 0, "group_chat_id": -5069461222},
-            "#15": {"client_id": 0, "group_chat_id": -5069461222},
-            "#16": {"client_id": 0, "group_chat_id": -5069461222},
-            "#17": {"client_id": 0, "group_chat_id": -5069461222},
-            "#18": {"client_id": 0, "group_chat_id": -5069461222},
-            "#19": {"client_id": 0, "group_chat_id": -5069461222},
-            "#20": {"client_id": 0, "group_chat_id": -5069461222}
+            "#1": {"group_chat_id": -5069461222},
+            "#2": {"group_chat_id": -5069461222},
+            "#3": {"group_chat_id": -5069461222},
+            "#4": {"group_chat_id": -5069461222},
+            "#5": {"group_chat_id": -5069461222},
+            "#6": {"group_chat_id": -5069461222},
+            "#7": {"group_chat_id": -5069461222},
+            "#8": {"group_chat_id": -5069461222},
+            "#9": {"group_chat_id": -5069461222},
+            "#10": {"group_chat_id": -5069461222},
+            "#11": {"group_chat_id": -5069461222},
+            "#12": {"group_chat_id": -5069461222},
+            "#13": {"group_chat_id": -5069461222},
+            "#14": {"group_chat_id": -5069461222},
+            "#15": {"group_chat_id": -5069461222},
+            "#16": {"group_chat_id": -5069461222},
+            "#17": {"group_chat_id": -5069461222},
+            "#18": {"group_chat_id": -5069461222},
+            "#19": {"group_chat_id": -5069461222},
+            "#20": {"group_chat_id": -5069461222}
         }
     }
 }
@@ -1068,9 +1068,6 @@ async def update_manager_buttons_with_channel_link(lot_id, channel_msg_id):
         # Кнопка на канал (теперь с ссылкой!)
         mgr_kb.button(text="📢 Пост в канале", url=channel_link)
         
-        if target_client_id and isinstance(target_client_id, int):
-            mgr_kb.button(text="👤 Чат с клиентом", url=f"tg://user?id={target_client_id}")
-        
         mgr_kb.button(text="📹 Запросить видео", callback_data=f"req_video_{lot_id}")
         mgr_kb.button(text="✅ БЕРУТ", callback_data=f"client_buy_{lot_id}")
         mgr_kb.button(text="❌ Отказ", callback_data=f"reject_{lot_id}")
@@ -1184,9 +1181,6 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
     if TARGET_CHANNEL_ID != 0:
         mgr_kb.button(text="📢 Пост в канале ⏳", callback_data=f"wait_channel_{main_lot_id}")
     
-    if target_client_id and isinstance(target_client_id, int):
-        mgr_kb.button(text="👤 Чат с клиентом", url=f"tg://user?id={target_client_id}")
-
     mgr_kb.button(text="📹 Запросить видео", callback_data=f"req_video_{main_lot_id}")
     mgr_kb.button(text="✅ БЕРУТ", callback_data=f"client_buy_{main_lot_id}")
     mgr_kb.button(text="❌ Отказ", callback_data=f"reject_{main_lot_id}")
@@ -1296,10 +1290,6 @@ async def send_to_single_client(callback, state, user_id, worker_name, anketa_id
     if TARGET_CHANNEL_ID != 0:
         mgr_kb.button(text="📢 Пост в канале ⏳", callback_data=f"wait_channel_{lot_id}")
     
-    # КНОПКА НА ЧАТ С КЛИЕНТОМ
-    if target_client_id and isinstance(target_client_id, int):
-        mgr_kb.button(text="👤 Чат с клиентом", url=f"tg://user?id={target_client_id}")
-
     mgr_kb.button(text="📹 Запросить видео", callback_data=f"req_video_{lot_id}")
     mgr_kb.button(text="✅ БЕРУТ", callback_data=f"client_buy_{lot_id}")
     mgr_kb.button(text="❌ Отказ", callback_data=f"reject_{lot_id}")
@@ -1493,9 +1483,6 @@ async def change_status_unified(callback: types.CallbackQuery):
     
     if chat_link: mgr_kb.button(text="🔗 Пост в группе", url=chat_link)
     
-    if target_client_id and isinstance(target_client_id, int):
-        mgr_kb.button(text="💬 Чат с клиентом", url=f"tg://user?id={target_client_id}")
-
     mgr_kb.button(text="📹 Запросить видео", callback_data=f"req_video_{lot_id}")
     mgr_kb.button(text="✅ БЕРУТ", callback_data=f"client_buy_{lot_id}")
     mgr_kb.button(text="❌ Отказ", callback_data=f"reject_{lot_id}")
@@ -1531,9 +1518,7 @@ async def manager_send_to_client(c: types.CallbackQuery):
         if f: await user_client.send_file(t, f, caption=ld['clean_text'], parse_mode='html')
         else: await user_client.send_message(t, ld['clean_text'], parse_mode='html')
         
-        success_kb = InlineKeyboardBuilder()
-        success_kb.button(text="💬 Открыть чат с клиентом", url=f"tg://user?id={t}")
-        await c.message.answer("✅ Улетело клиенту!", reply_markup=success_kb.as_markup())
+        await c.message.answer("✅ Улетело клиенту!")
         
     except Exception as e:
         await c.message.answer(f"❌ Ошибка отправки: {e}")
@@ -1558,7 +1543,9 @@ async def give_video_fin(m: types.Message, state: FSMContext):
         anketa_id = clean_text.split('\n')[0] if clean_text else "ID не найден"
         caption_text = f"📹 <b>ВИДЕО!</b> {anketa_id}"
         
-        mkb = InlineKeyboardBuilder(); mkb.button(text="🚀 Клиенту", callback_data=f"fwd_vid_{lid}"); mkb.adjust(1)
+        mkb = InlineKeyboardBuilder()
+        mkb.button(text=f"🚀 В чат клиента ({ld.get('client_tag', '')})", callback_data=f"fwd_vid_{lid}")
+        mkb.adjust(1)
         
         # Отправляем видео каждому менеджеру как ответ на его анкету
         manager_msgs = ld.get('manager_msgs', [])
@@ -1576,15 +1563,19 @@ async def give_video_fin(m: types.Message, state: FSMContext):
 
 @dp.callback_query(F.data.startswith("fwd_vid_"))
 async def fwd_vid(c: types.CallbackQuery):
-    lid = c.data.split("_")[2]; ld = LOTS_CACHE.get(lid); t = ld.get('target_client_id')
-    if not t: return await c.answer("No contact")
-    await c.answer("⏳..."); f = await bot.get_file(c.message.video.file_id); buf = io.BytesIO(); await bot.download_file(f.file_path, buf); buf.seek(0); buf.name="v.mp4"
+    lid = c.data.split("_")[2]; ld = LOTS_CACHE.get(lid)
+    if not ld: return await c.answer("Лот устарел", show_alert=True)
     
+    worker_id = ld.get('user_id')
+    client_tag = ld.get('client_tag')
+    actual_chat_id = get_client_group_chat(worker_id, client_tag) if worker_id and client_tag else None
+    
+    if not actual_chat_id: return await c.answer("Чат не найден", show_alert=True)
+    
+    await c.answer("⏳...")
     try:
-        await user_client.send_file(t, buf, caption="📹")
-        success_kb = InlineKeyboardBuilder()
-        success_kb.button(text="💬 Открыть чат с клиентом", url=f"tg://user?id={t}")
-        await c.message.answer("✅ Видео у клиента!", reply_markup=success_kb.as_markup())
+        await bot.send_video(actual_chat_id, c.message.video.file_id, caption="📹")
+        await c.message.answer(f"✅ Видео отправлено в чат {client_tag}!")
     except Exception as e:
         await c.message.answer(f"❌ Ошибка: {e}")
 
