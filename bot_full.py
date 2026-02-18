@@ -605,9 +605,6 @@ async def back_to_client(message: types.Message, state: FSMContext):
 async def start_calculator(message: types.Message, state: FSMContext, target_state, title, allow_skip=True):
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id)
     await fsm.set_state(target_state)
-    # Убираем предыдущие кнопки
-    temp_msg = await message.answer("⏳", reply_markup=ReplyKeyboardRemove())
-    await temp_msg.delete()
     calc_msg = await message.answer(f"{title}\n\n💡 <i>Введите число с клавиатуры</i>", reply_markup=get_calc_control_buttons(show_skip=allow_skip), parse_mode="HTML")
     await state.update_data(calc_title=title, calc_allow_skip=allow_skip, calc_msg_id=calc_msg.message_id)
 
@@ -914,9 +911,9 @@ async def check_edit_or_next(message, state, next_func):
 # ОТПРАВКА И ПОСТИНГ
 # ==========================================
 
-async def broadcast_to_channels_chat_only(media_files, text, specific_chat_id):
+async def broadcast_to_channels_chat_only(media_files, text, specific_chat_id, lot_id=""):
     """Отправляет пост только в конкретный чат (без канала)"""
-    channel_buttons = get_channel_status_kb("")
+    channel_buttons = get_channel_status_kb(lot_id)
     chat_msg_id = None
     chat_text_msg_id = None
     
@@ -1130,18 +1127,19 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
     first_client_tag = multi_clients[0]
     target_client_id = get_client_id(client_owner_id, first_client_tag)
     
-    clean_text = (f"👤 <b>{worker_name}</b>\nClient {first_client_tag}-{data.get('table')}\n🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n💰 Скидка: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=6776561610\">Contact Manager</a>")
+    clean_text = (f"👤 <b>{worker_name}</b>\nClient {first_client_tag} - {data.get('table')}\n🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n💰 Скидка: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=6776561610\">Contact Manager</a>")
     
-    # Отправляем в каждый чат клиента
+    # Отправляем в каждый чат клиента        
     first_chat_msg_id = None
     first_chat_text_msg_id = None
+    all_chat_messages = []
     is_first = True
     
     for client_tag in multi_clients:
         # Получаем групповой чат для каждого клиента
         actual_chat_id = get_client_group_chat(client_owner_id, client_tag)
         
-        public_text = (f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\nClient {client_tag}-{data.get('table')}\n🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n💰 Скидка: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=6776561610\">Contact Manager</a>")
+        public_text = (f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\nClient {client_tag} - {data.get('table')}\n🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n💰 Скидка: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=6776561610\">Contact Manager</a>")
         
         try:
             # Используем main_lot_id только для ПЕРВОГО клиента (для канала), остальным отправляем только в чат
@@ -1151,8 +1149,10 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
                 first_chat_text_msg_id = chat_text_msg_id
                 is_first = False
             else:
-                # Для остальных клиентов только в чат, без канала (передаем пустой lot_id)
-                _, chat_msg_id, chat_text_msg_id = await broadcast_to_channels_chat_only(data.get("media_files"), public_text, actual_chat_id)
+                # Для остальных клиентов только в чат, без канала, НО с правильным lot_id
+                _, chat_msg_id, chat_text_msg_id = await broadcast_to_channels_chat_only(data.get("media_files"), public_text, actual_chat_id, main_lot_id)
+            # Сохраняем все chat messages для обновления статуса
+            all_chat_messages.append({"chat_id": actual_chat_id, "msg_id": chat_msg_id, "text_msg_id": chat_text_msg_id})
             logging.info(f"✅ Отправлено {client_tag}")
         except Exception as e:
             logging.error(f"❌ Ошибка отправки {client_tag}: {e}")
@@ -1239,9 +1239,10 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
         "channel_text_msg_id": None,
         "chat_msg_id": first_chat_msg_id,
         "chat_text_msg_id": first_chat_text_msg_id,
+        "all_chat_messages": all_chat_messages,
         "manager_msgs": manager_msgs_info
     }
-    logging.info(f"💾 Сохранен lot_id={main_lot_id} для множественной отправки")
+    logging.info(f"💾 Сохранен lot_id={main_lot_id} для множественной отправки ({len(all_chat_messages)} чатов)")
     
     db_save_full_order(user_id, worker_name, anketa_id, data)
     await state.clear()
@@ -1254,11 +1255,11 @@ async def send_to_single_client(callback, state, user_id, worker_name, anketa_id
     if target_client_id and isinstance(target_client_id, int):
         client_link_text = f'<a href="tg://user?id={target_client_id}">{client_tag}</a>'
 
-    manager_body = (f"🆔 <b>ID: {anketa_id}</b>\n👤 <b>От:</b> {worker_name}\n🏷 <b>Клиент:</b> {client_link_text}-{data.get('table')}\n📱 Seller: {data.get('seller_number')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n💰 Скидка: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
+    manager_body = (f"🆔 <b>ID: {anketa_id}</b>\n👤 <b>От:</b> {worker_name}\n🏷 <b>Клиент:</b> {client_link_text} - {data.get('table')}\n📱 Seller: {data.get('seller_number')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n💰 Скидка: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
     manager_text_final = f"🟢 <b>Status: Available</b>\n\n{manager_body}"
 
-    public_text = (f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\nClient {client_tag}-{data.get('table')}\n🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n💰 Скидка: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=6776561610\">Contact Manager</a>")
-    clean_text = (f"👤 <b>{worker_name}</b>\nClient {client_tag}-{data.get('table')}\n🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n💰 Скидка: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=6776561610\">Contact Manager</a>")
+    public_text = (f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\nClient {client_tag} - {data.get('table')}\n🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n💰 Скидка: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=6776561610\">Contact Manager</a>")
+    clean_text = (f"👤 <b>{worker_name}</b>\nClient {client_tag} - {data.get('table')}\n🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n💰 Скидка: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=6776561610\">Contact Manager</a>")
 
     db_save_full_order(user_id, worker_name, anketa_id, data)
     lot_id = str(uuid.uuid4())[:8]
@@ -1407,36 +1408,66 @@ async def change_status_unified(callback: types.CallbackQuery):
     else:
         logging.warning(f"⚠️ Пропуск обновления канала: TARGET_CHANNEL_ID={TARGET_CHANNEL_ID}, chan_msg_id={chan_msg_id}")
 
-    # Обновляем ГРУППОВОЙ ЧАТ
-    worker_id = lot_data.get('user_id')
-    client_tag = lot_data.get('client_tag')
-    target_chat = get_client_group_chat(worker_id, client_tag) if worker_id and client_tag else lot_data['target_client_id']
-    chat_text_msg_id = lot_data.get('chat_text_msg_id')
-    chat_msg_id = lot_data.get('chat_msg_id')
+    # Обновляем ГРУППОВЫЕ ЧАТЫ (поддержка нескольких клиентов)
+    all_chat_messages = lot_data.get('all_chat_messages', [])
     
-    if target_chat and isinstance(target_chat, int) and target_chat < 0:
-        try:
-            # Для альбома в чате есть отдельное текстовое сообщение
-            if chat_text_msg_id:
-                await bot.edit_message_text(
-                    chat_id=target_chat, 
-                    message_id=chat_text_msg_id, 
-                    text=final_public_text, 
-                    reply_markup=get_channel_status_kb(lot_id), 
-                    parse_mode="HTML"
-                )
-            # Если одно фото/видео - редактируем caption
-            elif chat_msg_id:
-                await bot.edit_message_caption(
-                    chat_id=target_chat, 
-                    message_id=chat_msg_id, 
-                    caption=final_public_text, 
-                    reply_markup=get_channel_status_kb(lot_id), 
-                    parse_mode="HTML"
-                )
-            logging.info(f"✅ Статус обновлен в чате {target_chat}")
-        except Exception as e:
-            logging.error(f"❌ Ошибка обновления чата: {e}")
+    if all_chat_messages:
+        # Мульти-клиент: обновляем все чаты
+        for chat_info in all_chat_messages:
+            target_chat = chat_info.get('chat_id')
+            chat_text_msg_id = chat_info.get('text_msg_id')
+            chat_msg_id = chat_info.get('msg_id')
+            
+            if target_chat and isinstance(target_chat, int) and target_chat < 0:
+                try:
+                    if chat_text_msg_id:
+                        await bot.edit_message_text(
+                            chat_id=target_chat, 
+                            message_id=chat_text_msg_id, 
+                            text=final_public_text, 
+                            reply_markup=get_channel_status_kb(lot_id), 
+                            parse_mode="HTML"
+                        )
+                    elif chat_msg_id:
+                        await bot.edit_message_caption(
+                            chat_id=target_chat, 
+                            message_id=chat_msg_id, 
+                            caption=final_public_text, 
+                            reply_markup=get_channel_status_kb(lot_id), 
+                            parse_mode="HTML"
+                        )
+                    logging.info(f"✅ Статус обновлен в чате {target_chat}")
+                except Exception as e:
+                    logging.error(f"❌ Ошибка обновления чата {target_chat}: {e}")
+    else:
+        # Одиночный клиент: старая логика
+        worker_id = lot_data.get('user_id')
+        client_tag = lot_data.get('client_tag')
+        target_chat = get_client_group_chat(worker_id, client_tag) if worker_id and client_tag else lot_data['target_client_id']
+        chat_text_msg_id = lot_data.get('chat_text_msg_id')
+        chat_msg_id = lot_data.get('chat_msg_id')
+        
+        if target_chat and isinstance(target_chat, int) and target_chat < 0:
+            try:
+                if chat_text_msg_id:
+                    await bot.edit_message_text(
+                        chat_id=target_chat, 
+                        message_id=chat_text_msg_id, 
+                        text=final_public_text, 
+                        reply_markup=get_channel_status_kb(lot_id), 
+                        parse_mode="HTML"
+                    )
+                elif chat_msg_id:
+                    await bot.edit_message_caption(
+                        chat_id=target_chat, 
+                        message_id=chat_msg_id, 
+                        caption=final_public_text, 
+                        reply_markup=get_channel_status_kb(lot_id), 
+                        parse_mode="HTML"
+                    )
+                logging.info(f"✅ Статус обновлен в чате {target_chat}")
+            except Exception as e:
+                logging.error(f"❌ Ошибка обновления чата: {e}")
 
     # Пересоздаем клавиатуру менеджера с актуальными кнопками
     target_client_id = lot_data.get('target_client_id')
