@@ -197,6 +197,30 @@ EMPLOYEES_CONFIG = {
             "#19": {"group_chat_id": -5069461222},
             "#20": {"group_chat_id": -5069461222}
         }
+    },
+    6776561610: {  # Misha M (2)
+        "clients": {
+            "#1": {"group_chat_id": -5069461222},
+            "#2": {"group_chat_id": -5069461222},
+            "#3": {"group_chat_id": -5069461222},
+            "#4": {"group_chat_id": -5069461222},
+            "#5": {"group_chat_id": -5069461222},
+            "#6": {"group_chat_id": -5069461222},
+            "#7": {"group_chat_id": -5069461222},
+            "#8": {"group_chat_id": -5069461222},
+            "#9": {"group_chat_id": -5069461222},
+            "#10": {"group_chat_id": -5069461222},
+            "#11": {"group_chat_id": -5069461222},
+            "#12": {"group_chat_id": -5069461222},
+            "#13": {"group_chat_id": -5069461222},
+            "#14": {"group_chat_id": -5069461222},
+            "#15": {"group_chat_id": -5069461222},
+            "#16": {"group_chat_id": -5069461222},
+            "#17": {"group_chat_id": -5069461222},
+            "#18": {"group_chat_id": -5069461222},
+            "#19": {"group_chat_id": -5069461222},
+            "#20": {"group_chat_id": -5069461222}
+        }
     }
 }
 
@@ -247,6 +271,7 @@ def db_get_next_id(user_id):
     # Уникальные префиксы для каждого работника
     PREFIX_MAP = {
         610220736: "MM",      # Misha M
+        6776561610: "MM",     # Misha M (2)
         5442618444: "MK",     # Misha K
         645070075: "VL",      # Vladyslav
         625971673: "VIT",     # Vitalij
@@ -383,20 +408,23 @@ async def make_chat_link(chat_id, msg_id=None):
     if not chat_id:
         return None
     cid = str(chat_id)
-    # Супергруппа (ID начинается с -100) — прямая ссылка на сообщение
+    # Супергруппа — прямая ссылка
     if cid.startswith("-100"):
         clean = cid[4:]
-        if msg_id:
-            return f"https://t.me/c/{clean}/{msg_id}"
-        return f"https://t.me/c/{clean}"
-    # Обычная группа — получаем invite-ссылку через бота
+        return f"https://t.me/c/{clean}/{msg_id}" if msg_id else f"https://t.me/c/{clean}"
+    # Обычная группа — invite-ссылка (бот должен быть админом)
     try:
-        invite = await bot.create_chat_invite_link(chat_id)
-        logging.info(f"🔗 Создана invite-ссылка для чата {chat_id}: {invite.invite_link}")
-        return invite.invite_link
+        chat_info = await bot.get_chat(chat_id)
+        if chat_info.invite_link:
+            return chat_info.invite_link
+    except Exception:
+        pass
+    try:
+        link = await bot.export_chat_invite_link(chat_id)
+        return link
     except Exception as e:
-        logging.error(f"❌ Не удалось создать ссылку для чата {chat_id}: {e}")
-        return None
+        logging.warning(f"Cannot create invite link for {chat_id}: {e}")
+    return None
 
 def get_channel_status_kb(lot_id):
     builder = InlineKeyboardBuilder()
@@ -1131,13 +1159,13 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
     clients_display = ", ".join(multi_clients)
     
     await callback.message.answer(f"✅ <b>Отправляю анкету {len(multi_clients)} клиентам...</b>\n🆔 <b>ID: {anketa_id}</b>", reply_markup=start_kb, parse_mode="HTML")
-    
+
     # Создаем общий lot_id для всех клиентов (для статуса в канале)
     main_lot_id = str(uuid.uuid4())[:8]
     first_client_tag = multi_clients[0]
     target_client_id = get_client_id(client_owner_id, first_client_tag)
     
-    clean_text = (f"👤 <b>{worker_name}</b>\nClient {first_client_tag}-{data.get('table')}\n🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n💰 Discount: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=6776561610\">Contact Manager</a>")
+    clean_text = (f"👤 <b>{worker_name}</b>\nClient {first_client_tag}-{data.get('table')}\n🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n💰 Discount: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=8548264779\">Contact Manager</a>")
     
     # Отправляем в каждый чат клиента        
     first_chat_msg_id = None
@@ -1149,7 +1177,7 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
         # Получаем групповой чат для каждого клиента
         actual_chat_id = get_client_group_chat(client_owner_id, client_tag)
         
-        public_text = (f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\nClient {client_tag}-{data.get('table')}\n🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n💰 Discount: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=6776561610\">Contact Manager</a>")
+        public_text = (f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\nClient {client_tag}-{data.get('table')}\n🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n💰 Discount: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=8548264779\">Contact Manager</a>")
         
         try:
             # Используем main_lot_id только для ПЕРВОГО клиента (для канала), остальным отправляем только в чат
@@ -1167,6 +1195,24 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
         except Exception as e:
             logging.error(f"❌ Ошибка отправки {client_tag}: {e}")
     
+    # Ссылки на чаты для работника
+    worker_links_kb = InlineKeyboardBuilder()
+    for cm in all_chat_messages:
+        cl_chat_id = cm.get("chat_id")
+        cl_msg_id = cm.get("msg_id")
+        cl_link = await make_chat_link(cl_chat_id, cl_msg_id)
+        if cl_link:
+            # Найдём тег клиента по chat_id
+            tag = "Чат"
+            for ct in multi_clients:
+                if get_client_group_chat(client_owner_id, ct) == cl_chat_id:
+                    tag = ct
+                    break
+            worker_links_kb.button(text=f"🔗 {tag}", url=cl_link)
+    worker_links_kb.adjust(2)
+    if all_chat_messages:
+        await callback.message.answer(f"📍 Анкета отправлена в {len(multi_clients)} чатов:", reply_markup=worker_links_kb.as_markup(), parse_mode="HTML")
+
     # Отправляем менеджеру сводку
     manager_body = (f"🆔 <b>ID: {anketa_id}</b>\n👤 <b>От:</b> {worker_name}\n🏷 <b>Клиенты:</b> {clients_display}\n📱 Seller: {data.get('seller_number')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n💰 Discount: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
     manager_text_final = f"🟢 <b>Status: Available</b>\n\n{manager_body}\n\n📤 <b>Отправлено {len(multi_clients)} клиентам</b>"
@@ -1255,15 +1301,12 @@ async def send_to_single_client(callback, state, user_id, worker_name, anketa_id
     manager_body = (f"🆔 <b>ID: {anketa_id}</b>\n👤 <b>От:</b> {worker_name}\n🏷 <b>Клиент:</b> {client_link_text}-{data.get('table')}\n📱 Seller: {data.get('seller_number')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n💰 Discount: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
     manager_text_final = f"🟢 <b>Status: Available</b>\n\n{manager_body}"
 
-    public_text = (f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\nClient {client_tag}-{data.get('table')}\n🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n💰 Discount: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=6776561610\">Contact Manager</a>")
-    clean_text = (f"👤 <b>{worker_name}</b>\nClient {client_tag}-{data.get('table')}\n🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n💰 Discount: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=6776561610\">Contact Manager</a>")
+    public_text = (f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\nClient {client_tag}-{data.get('table')}\n🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n💰 Discount: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=8548264779\">Contact Manager</a>")
+    clean_text = (f"👤 <b>{worker_name}</b>\nClient {client_tag}-{data.get('table')}\n🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n💰 Discount: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=8548264779\">Contact Manager</a>")
 
     db_save_full_order(user_id, worker_name, anketa_id, data)
     lot_id = str(uuid.uuid4())[:8]
     
-    start_kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🔄 Новые часы")]], resize_keyboard=True)
-    worker_msg = await callback.message.answer(f"✅ <b>Отправлено!</b>\n🆔 <b>ID: {anketa_id}</b>", reply_markup=start_kb, parse_mode="HTML")
-
     # Получаем групповой чат для этого клиента (используем владельца клиента)
     actual_chat_id = get_client_group_chat(client_owner_id, client_tag)
     
@@ -1271,6 +1314,15 @@ async def send_to_single_client(callback, state, user_id, worker_name, anketa_id
 
     # ГЕНЕРАЦИЯ ССЫЛКИ НА ЧАТ
     chat_link = await make_chat_link(actual_chat_id, chat_msg_id)
+
+    # Кнопки для работника
+    start_kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🔄 Новые часы")]], resize_keyboard=True)
+    worker_msg = await callback.message.answer(f"✅ <b>Отправлено!</b>\n🆔 <b>ID: {anketa_id}</b>", reply_markup=start_kb, parse_mode="HTML")
+    
+    if chat_link:
+        worker_link_kb = InlineKeyboardBuilder()
+        worker_link_kb.button(text=f"🔗 Чат {client_tag}", url=chat_link)
+        await callback.message.answer(f"📍 Анкета отправлена в чат <b>{client_tag}</b>", reply_markup=worker_link_kb.as_markup(), parse_mode="HTML")
 
     # СБОРКА КНОПОК ДЛЯ МЕНЕДЖЕРА
     mgr_kb = InlineKeyboardBuilder()
