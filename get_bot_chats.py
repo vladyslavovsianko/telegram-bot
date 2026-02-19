@@ -9,51 +9,93 @@ TOKEN = os.getenv("BOT_TOKEN")
 bot = Bot(token=TOKEN)
 
 async def main():
-    print("=" * 50)
-    print("  BOT CHATS - ID всех чатов где есть бот")
-    print("=" * 50)
+    print("=" * 70)
+    print("  BOT CHATS CHECK")
+    print("=" * 70)
     
-    # Получаем инфо о боте
     me = await bot.get_me()
-    print(f"\nБот: @{me.username} (ID: {me.id})")
-    print("-" * 50)
+    print(f"\nBot: @{me.username} (ID: {me.id})\n")
     
-    # Проверяем чаты из EMPLOYEES_CONFIG
-    from bot_full import EMPLOYEES_CONFIG
+    from bot_full import EMPLOYEES_CONFIG, TARGET_CHANNEL_ID, VIP_GROUP_ID, TARGET_CHAT_ID
     
-    checked = set()
-    print("\nЧаты из EMPLOYEES_CONFIG:\n")
+    # Собираем ВСЕ уникальные chat_id
+    all_ids = set()
+    
+    if TARGET_CHANNEL_ID: all_ids.add(TARGET_CHANNEL_ID)
+    if VIP_GROUP_ID: all_ids.add(VIP_GROUP_ID)
+    if TARGET_CHAT_ID: all_ids.add(TARGET_CHAT_ID)
     
     for worker_id, worker_data in EMPLOYEES_CONFIG.items():
-        clients = worker_data.get("clients", {})
-        for client_tag, client_info in clients.items():
-            chat_id = client_info.get("group_chat_id")
-            if chat_id and chat_id not in checked:
-                checked.add(chat_id)
-                try:
-                    chat = await bot.get_chat(chat_id)
-                    chat_type = chat.type
-                    title = chat.title or "N/A"
-                    is_super = "SUPERGROUP" if chat_type == "supergroup" else "GROUP"
-                    invite = chat.invite_link or "нет"
-                    print(f"  {is_super}: {title}")
-                    print(f"    ID: {chat_id}")
-                    print(f"    Тип: {chat_type}")
-                    print(f"    Invite: {invite}")
-                    
-                    # Проверяем права бота
-                    try:
-                        member = await bot.get_chat_member(chat_id, me.id)
-                        print(f"    Бот: {member.status}")
-                    except:
-                        print(f"    Бот: неизвестно")
-                    print()
-                except Exception as e:
-                    print(f"  ERROR: chat_id={chat_id}")
-                    print(f"    {e}\n")
+        for client_tag, client_info in worker_data.get("clients", {}).items():
+            gid = client_info.get("group_chat_id")
+            if gid: all_ids.add(gid)
     
-    print("-" * 50)
-    print(f"Всего уникальных чатов: {len(checked)}")
+    all_ids.discard(0)
+    
+    groups = []
+    supergroups = []
+    channels = []
+    errors = []
+    
+    for chat_id in sorted(all_ids):
+        try:
+            chat = await bot.get_chat(chat_id)
+            title = chat.title or "N/A"
+            ctype = chat.type
+            
+            # Проверяем права бота
+            try:
+                member = await bot.get_chat_member(chat_id, me.id)
+                role = member.status
+            except:
+                role = "?"
+            
+            info = {"id": chat_id, "title": title, "type": ctype, "role": role}
+            
+            if ctype == "supergroup":
+                supergroups.append(info)
+            elif ctype == "group":
+                groups.append(info)
+            elif ctype == "channel":
+                channels.append(info)
+        except Exception as e:
+            errors.append({"id": chat_id, "error": str(e)})
+    
+    if supergroups:
+        print(f"SUPERGROUPS ({len(supergroups)}) - links t.me/c/ WORK")
+        print("-" * 70)
+        for c in supergroups:
+            print(f"  {c['id']:<20} {c['title']:<30} bot={c['role']}")
+        print()
+    
+    if groups:
+        print(f"GROUPS ({len(groups)}) - NEED TO CONVERT to supergroup!")
+        print("-" * 70)
+        for c in groups:
+            print(f"  {c['id']:<20} {c['title']:<30} bot={c['role']}")
+        print()
+    
+    if channels:
+        print(f"CHANNELS ({len(channels)})")
+        print("-" * 70)
+        for c in channels:
+            print(f"  {c['id']:<20} {c['title']:<30} bot={c['role']}")
+        print()
+    
+    if errors:
+        print(f"ERRORS ({len(errors)}) - bot NOT in these chats!")
+        print("-" * 70)
+        for c in errors:
+            print(f"  {c['id']:<20} {c['error']}")
+        print()
+    
+    total = len(supergroups) + len(groups) + len(channels)
+    print("=" * 70)
+    print(f"Total accessible: {total}")
+    print(f"  Supergroups: {len(supergroups)} (links work)")
+    print(f"  Groups:      {len(groups)} (convert these!)")
+    print(f"  Channels:    {len(channels)}")
+    print(f"  Errors:      {len(errors)}")
     
     await bot.session.close()
 

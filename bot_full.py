@@ -403,28 +403,16 @@ def get_calc_control_buttons(show_skip=True):
     builder.adjust(2 if show_skip else 1)
     return builder.as_markup()
 
-async def make_chat_link(chat_id, msg_id=None):
+def make_chat_link(chat_id, msg_id=None):
     """Генерирует ссылку на групповой чат Telegram"""
     if not chat_id:
         return None
     cid = str(chat_id)
-    # Супергруппа — прямая ссылка
     if cid.startswith("-100"):
         clean = cid[4:]
-        return f"https://t.me/c/{clean}/{msg_id}" if msg_id else f"https://t.me/c/{clean}"
-    # Обычная группа — invite-ссылка (бот должен быть админом)
-    try:
-        chat_info = await bot.get_chat(chat_id)
-        if chat_info.invite_link:
-            return chat_info.invite_link
-    except Exception:
-        pass
-    try:
-        link = await bot.export_chat_invite_link(chat_id)
-        return link
-    except Exception as e:
-        logging.warning(f"Cannot create invite link for {chat_id}: {e}")
-    return None
+    else:
+        clean = cid.lstrip("-")
+    return f"https://t.me/c/{clean}/{msg_id}" if msg_id else f"https://t.me/c/{clean}"
 
 def get_channel_status_kb(lot_id):
     builder = InlineKeyboardBuilder()
@@ -1098,7 +1086,7 @@ async def update_manager_buttons_with_channel_link(lot_id, channel_msg_id):
         
         # Ссылка на групповой чат
         actual_chat_id = get_client_group_chat(user_id, client_tag) if user_id and client_tag else None
-        chat_link = await make_chat_link(actual_chat_id, chat_msg_id)
+        chat_link = make_chat_link(actual_chat_id, chat_msg_id)
     
         # Пересоздаем кнопки
         mgr_kb = InlineKeyboardBuilder()
@@ -1200,7 +1188,7 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
     for cm in all_chat_messages:
         cl_chat_id = cm.get("chat_id")
         cl_msg_id = cm.get("msg_id")
-        cl_link = await make_chat_link(cl_chat_id, cl_msg_id)
+        cl_link = make_chat_link(cl_chat_id, cl_msg_id)
         if cl_link:
             # Найдём тег клиента по chat_id
             tag = "Чат"
@@ -1219,7 +1207,7 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
     
     # Генерируем ссылку на первый групповой чат
     actual_chat_id = get_client_group_chat(client_owner_id, first_client_tag)
-    chat_link = await make_chat_link(actual_chat_id, first_chat_msg_id)
+    chat_link = make_chat_link(actual_chat_id, first_chat_msg_id)
     
     # Создаем кнопки для менеджера
     mgr_kb = InlineKeyboardBuilder()
@@ -1313,7 +1301,7 @@ async def send_to_single_client(callback, state, user_id, worker_name, anketa_id
     _, chat_msg_id, chat_text_msg_id = await broadcast_to_channels(data.get("media_files"), public_text, lot_id, actual_chat_id)
 
     # ГЕНЕРАЦИЯ ССЫЛКИ НА ЧАТ
-    chat_link = await make_chat_link(actual_chat_id, chat_msg_id)
+    chat_link = make_chat_link(actual_chat_id, chat_msg_id)
 
     # Кнопки для работника
     start_kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🔄 Новые часы")]], resize_keyboard=True)
@@ -1510,7 +1498,7 @@ async def change_status_unified(callback: types.CallbackQuery):
     # Получаем ссылку на пост в группе
     chat_msg_id = lot_data.get('chat_msg_id')
     actual_chat_id = get_client_group_chat(worker_id, client_tag) if worker_id and client_tag else target_client_id
-    chat_link = await make_chat_link(actual_chat_id, chat_msg_id)
+    chat_link = make_chat_link(actual_chat_id, chat_msg_id)
     
     mgr_kb = InlineKeyboardBuilder()
     
