@@ -31,7 +31,7 @@ MANAGER_IDS = [int(x) for x in os.getenv("MANAGER_IDS", "").split(",") if x]
 STATUS_MODERATORS = [int(x) for x in os.getenv("STATUS_MODERATORS", "").split(",") if x]
 
 # КАНАЛЫ (Витрина)
-TARGET_CHANNEL_ID = int(os.getenv("TARGET_CHANNEL_ID", "0"))
+TARGET_CHANNEL_ID = int(os.getenv("TARGET_CHANNEL_ID", "-1003745353210"))
 
 # ГРУППА ДЛЯ АВТО-ПОСТИНГА VIP
 VIP_GROUP_ID = int(os.getenv("VIP_GROUP_ID", "0"))
@@ -40,7 +40,7 @@ VIP_GROUP_ID = int(os.getenv("VIP_GROUP_ID", "0"))
 TARGET_CHAT_ID = int(os.getenv("TARGET_CHAT_ID", "0"))
 
 # ⏱ ЗАДЕРЖКА ПУБЛИКАЦИИ В КАНАЛ (СЕКУНДЫ)
-CHANNEL_POST_DELAY = int(os.getenv("CHANNEL_POST_DELAY", "10"))
+CHANNEL_POST_DELAY = int(os.getenv("CHANNEL_POST_DELAY", "120"))
 
 API_ID = int(os.getenv("API_ID", "0"))
 API_HASH = os.getenv("API_HASH", "")
@@ -74,7 +74,6 @@ EMPLOYEES_CONFIG = {
     },
     610220736: { 
         "clients": { 
-            "#VIP_Chat": {"client_id": 610220736, "group_chat_id": -1003745353210},
             "#1": {"group_chat_id": -5182586637},
             "#2": {"group_chat_id": -5105834721},
             "#3": {"group_chat_id": -5029226279},
@@ -147,6 +146,7 @@ EMPLOYEES_CONFIG = {
             "#76": {"group_chat_id": -5289378718},
             "#78": {"group_chat_id": -5069461222},
             "#91": {"group_chat_id": -5094267136},
+            "#94": {"group_chat_id": -5217474814},
             "#98": {"group_chat_id": -4968185056},
             "#100": {"group_chat_id": -5135458325},
             "#110": {"group_chat_id": -5157805999},
@@ -1213,6 +1213,11 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
                     tag = ct
                     break
             worker_links_kb.button(text=f"🔗 {tag}", url=cl_link)
+    # Для Vladyslav — всегда добавляем кнопку на основной чат
+    if client_owner_id == 645070075:
+        vlad_link = await make_chat_link(-5257627627)
+        if vlad_link:
+            worker_links_kb.button(text="🔗 Основной чат", url=vlad_link)
     worker_links_kb.adjust(2)
     if all_chat_messages:
         await callback.message.answer(f"📍 Анкета отправлена в {len(multi_clients)} чатов:", reply_markup=worker_links_kb.as_markup(), parse_mode="HTML")
@@ -1323,9 +1328,15 @@ async def send_to_single_client(callback, state, user_id, worker_name, anketa_id
     start_kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🔄 Новые часы")]], resize_keyboard=True)
     worker_msg = await callback.message.answer(f"✅ <b>Отправлено!</b>\n🆔 <b>ID: {anketa_id}</b>", reply_markup=start_kb, parse_mode="HTML")
     
+    worker_link_kb = InlineKeyboardBuilder()
     if chat_link:
-        worker_link_kb = InlineKeyboardBuilder()
         worker_link_kb.button(text=f"🔗 Чат {client_tag}", url=chat_link)
+    # Для Vladyslav — всегда добавляем кнопку на основной чат
+    if client_owner_id == 645070075:
+        vlad_link = await make_chat_link(-5257627627)
+        if vlad_link:
+            worker_link_kb.button(text="🔗 Основной чат", url=vlad_link)
+    if worker_link_kb._buttons:
         await callback.message.answer(f"📍 Анкета отправлена в чат <b>{client_tag}</b>", reply_markup=worker_link_kb.as_markup(), parse_mode="HTML")
 
     # СБОРКА КНОПОК ДЛЯ МЕНЕДЖЕРА
