@@ -196,6 +196,7 @@ EMPLOYEES_CONFIG = {
     6776561610: {  # Misha M (2)
         "clients": {
             "#23": {"group_chat_id": -5104162767},
+            "#51": {"group_chat_id": -5001283164},
             "#54": {"group_chat_id": -5213680626},
             "#58": {"group_chat_id": -5227727762},
             "#61": {"group_chat_id": -5293857124},
