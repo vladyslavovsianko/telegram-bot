@@ -3,6 +3,7 @@ import logging
 import uuid
 import os
 import io
+import json
 import sqlite3
 from contextlib import suppress
 from aiogram import Bot, Dispatcher, F, types
@@ -178,6 +179,7 @@ EMPLOYEES_CONFIG = {
             "Lex6": {"group_chat_id": -5112242325},
             "Lex7": {"group_chat_id": -5279607641},
             "Lex10": {"group_chat_id": -5204094110},
+            "Lex11": {"group_chat_id": -5083040356},
             "Lex12": {"group_chat_id": -5251934001},
             "Lex18": {"group_chat_id": -5226630032},
             "Lex19": {"group_chat_id": -5254977860},
@@ -224,8 +226,29 @@ EMPLOYEES_CONFIG = {
 }
 
 DB_FILE = 'bot_database.db'
+LOTS_CACHE_FILE = 'lots_cache.json'
 LOTS_CACHE = {}
 INVITE_LINK_CACHE = {}  # chat_id -> invite_link (кэш инвайт-ссылок)
+
+def save_lots_cache():
+    """Сохраняет LOTS_CACHE в JSON файл"""
+    try:
+        with open(LOTS_CACHE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(LOTS_CACHE, f, ensure_ascii=False)
+    except Exception as e:
+        logging.error(f"Ошибка сохранения LOTS_CACHE: {e}")
+
+def load_lots_cache():
+    """Загружает LOTS_CACHE из JSON файла"""
+    global LOTS_CACHE
+    try:
+        if os.path.exists(LOTS_CACHE_FILE):
+            with open(LOTS_CACHE_FILE, 'r', encoding='utf-8') as f:
+                LOTS_CACHE = json.load(f)
+            logging.info(f"Загружено {len(LOTS_CACHE)} лотов из кэша")
+    except Exception as e:
+        logging.error(f"Ошибка загрузки LOTS_CACHE: {e}")
+        LOTS_CACHE = {}
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=TOKEN)
@@ -244,15 +267,16 @@ def init_db():
     cursor.execute('''CREATE TABLE IF NOT EXISTS orders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             worker_id INTEGER, worker_name TEXT, anketa_id TEXT, client_tag TEXT, 
-            seller_name TEXT, seller_number TEXT, table_num TEXT, price TEXT, 
+            manager_comment TEXT, table_num TEXT, price TEXT, 
             chrono_price TEXT, negotiation TEXT, year TEXT, diameter TEXT, 
             wrist TEXT, kit TEXT, condition TEXT, material TEXT, rating TEXT, status TEXT DEFAULT 'Available',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
-    # Миграция: добавляем колонку material если её нет
-    try:
-        cursor.execute("ALTER TABLE orders ADD COLUMN material TEXT")
-    except:
-        pass  # колонка уже существует
+    # Миграции: добавляем новые колонки если их нет
+    for col in ["material TEXT", "manager_comment TEXT"]:
+        try:
+            cursor.execute(f"ALTER TABLE orders ADD COLUMN {col}")
+        except:
+            pass  # колонка уже существует
     conn.commit()
     conn.close()
 
@@ -295,12 +319,12 @@ def db_save_full_order(user_id, worker_name, anketa_id, data):
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         cursor.execute('''INSERT INTO orders (
-                worker_id, worker_name, anketa_id, client_tag, seller_name, seller_number, 
+                worker_id, worker_name, anketa_id, client_tag, manager_comment, 
                 table_num, price, chrono_price, negotiation, year, diameter, wrist, kit, 
                 condition, material, rating
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (
-            user_id, worker_name, anketa_id, data.get('client'), data.get('seller_name'),
-            data.get('seller_number'), data.get('table'), data.get('price'),
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (
+            user_id, worker_name, anketa_id, data.get('client'), data.get('manager_comment'),
+            data.get('table'), data.get('price'),
             data.get('chrono_price'), data.get('negotiation'), data.get('year'),
             data.get('diameter'), data.get('wrist'), data.get('kit'),
             data.get('condition'), data.get('material'), data.get('rating')
@@ -344,8 +368,7 @@ class Form(StatesGroup):
     choosing_kit = State()
     choosing_condition = State()
     entering_material = State()
-    entering_seller_name = State()   
-    entering_seller_number = State() 
+    entering_manager_comment = State() 
     choosing_worker_rating = State()
     entering_custom_rating = State()
     final_review = State()
@@ -479,7 +502,8 @@ async def show_client_menu(message: types.Message, user_id=None):
         if user_id in MANAGER_IDS: pass
         else: await message.answer("⚠️ Нет клиентов."); return
     
-    # Добавляем кнопку для множественного выбора
+    # Добавляем кнопку для множественного выбора + канал
+    clients_list.append("📢 Канал")
     kb = make_kb(clients_list, rows=3, back=False, skip=False, done_text="📋 Несколько клиентов") 
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id)
     await fsm.set_state(Form.choosing_client)
@@ -492,6 +516,11 @@ async def process_client(message: types.Message, state: FSMContext):
     if message.text == "📋 Несколько клиентов":
         logging.info("▶ Переход в режим множественного выбора")
         return await start_multi_client_selection(message, state)
+    
+    if message.text == "📢 Канал":
+        logging.info("▶ Режим отправки только в канал")
+        await state.update_data(client="📢 Channel", channel_only=True)
+        return await check_edit_or_next(message, state, show_media_menu)
     
     data = await state.get_data()
     logging.info(f"🔍 State data: multi_mode={data.get('multi_mode')}, selected={data.get('selected_clients', [])}")
@@ -670,7 +699,7 @@ async def start_calculator(message: types.Message, state: FSMContext, target_sta
     await state.update_data(calc_title=title, calc_allow_skip=allow_skip, calc_msg_id=calc_msg.message_id)
 
 # Обработчик кнопок управления калькулятором
-@dp.callback_query(F.data.startswith("calc_"), StateFilter(Form.entering_seller_number, Form.entering_table, Form.entering_price, Form.entering_chrono_price, Form.manual_year, Form.manual_diameter, Form.manual_wrist))
+@dp.callback_query(F.data.startswith("calc_"), StateFilter(Form.entering_table, Form.entering_price, Form.entering_chrono_price, Form.manual_year, Form.manual_diameter, Form.manual_wrist))
 async def process_calc_buttons(callback: types.CallbackQuery, state: FSMContext):
     action = callback.data.replace("calc_", "")
     data = await state.get_data()
@@ -693,8 +722,7 @@ async def process_calc_buttons(callback: types.CallbackQuery, state: FSMContext)
             await show_final_review(callback.message, state)
         else:
             # Обычный режим - назад к предыдущему шагу
-            if curr_state == Form.entering_seller_number: await ask_material(callback.message)
-            elif curr_state == Form.entering_table: await show_media_menu(callback.message)
+            if curr_state == Form.entering_table: await show_media_menu(callback.message)
             elif curr_state == Form.entering_price: await start_calculator(callback.message, state, Form.entering_table, "3️⃣ <b>Введи номер СТОЛА:</b>", allow_skip=True)
             elif curr_state == Form.entering_chrono_price: await start_calculator(callback.message, state, Form.entering_price, "4️⃣ <b>Введи ЦЕНУ (EUR):</b>", allow_skip=True)
             elif curr_state == Form.manual_year: await show_year_menu(callback.message)
@@ -714,9 +742,7 @@ async def process_calc_buttons(callback: types.CallbackQuery, state: FSMContext)
         final_val = "—"
         curr_state = await state.get_state()
         
-        if curr_state == Form.entering_seller_number:
-            await state.update_data(seller_number=final_val); await check_edit_or_next(callback.message, state, show_worker_rating_menu)
-        elif curr_state == Form.entering_table:
+        if curr_state == Form.entering_table:
             await state.update_data(table=final_val); await check_edit_or_next(callback.message, state, lambda m: start_calculator(m, state, Form.entering_price, "4️⃣ <b>Введи ЦЕНУ (EUR):</b>", allow_skip=False))
         elif curr_state == Form.entering_price:
             await state.update_data(price=final_val); await check_edit_or_next(callback.message, state, lambda m: start_calculator(m, state, Form.entering_chrono_price, "5️⃣ <b>Цена CHRONO24:</b>", allow_skip=False))
@@ -734,7 +760,7 @@ async def process_calc_buttons(callback: types.CallbackQuery, state: FSMContext)
     await callback.answer()
 
 # Обработчик текстового ввода чисел
-@dp.message(StateFilter(Form.entering_seller_number, Form.entering_table, Form.entering_price, Form.entering_chrono_price, Form.manual_year, Form.manual_diameter, Form.manual_wrist))
+@dp.message(StateFilter(Form.entering_table, Form.entering_price, Form.entering_chrono_price, Form.manual_year, Form.manual_diameter, Form.manual_wrist))
 async def process_text_input(message: types.Message, state: FSMContext):
     data = await state.get_data()
     calc_msg_id = data.get("calc_msg_id")
@@ -750,10 +776,7 @@ async def process_text_input(message: types.Message, state: FSMContext):
     final_val = message.text if message.text else "0"
     curr_state = await state.get_state()
     
-    if curr_state == Form.entering_seller_number:
-        await state.update_data(seller_number=final_val)
-        await check_edit_or_next(message, state, show_worker_rating_menu)
-    elif curr_state == Form.entering_table:
+    if curr_state == Form.entering_table:
         await state.update_data(table=final_val)
         await check_edit_or_next(message, state, lambda m: start_calculator(m, state, Form.entering_price, "4️⃣ <b>Введи ЦЕНУ (EUR):</b>", allow_skip=True))
     elif curr_state == Form.entering_price:
@@ -880,17 +903,21 @@ async def process_material(message: types.Message, state: FSMContext):
             return await show_final_review(message, state)
         return await show_condition_menu(message)
     val = "—" if message.text == "⏩ Пропустить" else message.text
-    await state.update_data(material=val); await check_edit_or_next(message, state, lambda m: start_calculator(m, state, Form.entering_seller_number, "📱 <b>Введи НОМЕР продавца:</b>", allow_skip=True))
+    await state.update_data(material=val); await check_edit_or_next(message, state, ask_manager_comment)
 
-async def ask_seller_name(message):
+async def ask_manager_comment(message):
     kb = make_kb([], rows=1, back=True, skip=True)
-    fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id); await fsm.set_state(Form.entering_seller_name); await bot.send_message(message.chat.id, "✍️ <b>Введи ИМЯ продавца:</b>", reply_markup=kb, parse_mode="HTML")
+    fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id); await fsm.set_state(Form.entering_manager_comment); await bot.send_message(message.chat.id, "💬 <b>Комментарий менеджера (Manager comment):</b>", reply_markup=kb, parse_mode="HTML")
 
-@dp.message(Form.entering_seller_name)
-async def process_seller_name(message: types.Message, state: FSMContext):
-    if message.text == "🔙 Назад": return await show_final_review(message, state)
+@dp.message(Form.entering_manager_comment)
+async def process_manager_comment(message: types.Message, state: FSMContext):
+    if message.text == "🔙 Назад":
+        data = await state.get_data()
+        if data.get("editing_mode"):
+            return await show_final_review(message, state)
+        return await ask_material(message)
     val = "—" if message.text == "⏩ Пропустить" else message.text
-    await state.update_data(seller_name=val); await check_edit_or_next(message, state, lambda m: start_calculator(m, state, Form.entering_seller_number, "📱 <b>Введи НОМЕР продавца:</b>", allow_skip=True))
+    await state.update_data(manager_comment=val); await check_edit_or_next(message, state, show_worker_rating_menu)
 
 async def show_worker_rating_menu(message):
     kb = make_kb(["✅ Рекомендую", "👌 Нормально", "❌ Не рекомендую"], rows=3, back=True, skip=True)
@@ -902,7 +929,7 @@ async def process_rating(message: types.Message, state: FSMContext):
     if message.text == "🔙 Назад":
         if data.get("editing_mode"):
             return await show_final_review(message, state)
-        return await start_calculator(message, state, Form.entering_seller_number, "📱 <b>Введи НОМЕР продавца:</b>", allow_skip=True)
+        return await ask_manager_comment(message)
     val = message.text
     if message.text == "⏩ Пропустить": val = "—"
     elif message.text == "✅ Рекомендую": val = "✅ Recommended"
@@ -917,7 +944,7 @@ async def process_rating(message: types.Message, state: FSMContext):
 async def show_final_review(message: types.Message, state: FSMContext):
     await state.update_data(editing_mode=False)
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id); await fsm.set_state(Form.final_review); data = await state.get_data()
-    text = (f"📋 <b>ПРОВЕРКА (Вид для клиента):</b>\n\n👤 Client: {data.get('client')}-{data.get('table')}\n📱 Seller: {data.get('seller_number')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n💰 Discount: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n🪨 Material: {data.get('material', '—')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
+    text = (f"📋 <b>ПРОВЕРКА (Вид для клиента):</b>\n\n👤 Client: {data.get('client')}-{data.get('table')}\n💬 Manager: {data.get('manager_comment', '—')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n💰 Discount: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n🪨 Material: {data.get('material', '—')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
     builder = InlineKeyboardBuilder(); builder.button(text="✏️ Изменить", callback_data="open_edit_menu"); builder.button(text="✅ ОТПРАВИТЬ МЕНЕДЖЕРУ", callback_data="send_final"); builder.adjust(1)
     msg = await message.answer("Загружаю анкету...", reply_markup=ReplyKeyboardRemove()); await msg.delete()
     media_files = data.get("media_files", [])
@@ -946,7 +973,7 @@ async def show_edit_menu(c: types.CallbackQuery):
     b.button(text="📅 Year", callback_data="edit_year"); b.button(text="📏 Diam", callback_data="edit_diam")
     b.button(text="🖐 Wrist", callback_data="edit_wrist"); b.button(text="📦 Set", callback_data="edit_kit")
     b.button(text="⚙️ Cond", callback_data="edit_cond"); b.button(text="🪨 Material", callback_data="edit_material")
-    b.button(text="👨‍💼 Seller", callback_data="edit_seller"); b.button(text="👀 Rating", callback_data="edit_rating")
+    b.button(text="💬 Manager", callback_data="edit_mgrcomment"); b.button(text="👀 Rating", callback_data="edit_rating")
     b.button(text="🔙 Назад", callback_data="back_to_review")
     b.adjust(2, 2, 2, 2, 2, 2, 2, 2, 1); await c.message.edit_reply_markup(reply_markup=b.as_markup())
 
@@ -971,7 +998,7 @@ async def process_edit_click(c: types.CallbackQuery, state: FSMContext):
     elif field == "kit": await show_kit_menu(c.message)
     elif field == "cond": await show_condition_menu(c.message)
     elif field == "material": await ask_material(c.message)
-    elif field == "seller": await ask_seller_name(c.message)
+    elif field == "mgrcomment": await ask_manager_comment(c.message)
     elif field == "rating": await show_worker_rating_menu(c.message)
     await c.answer()
 
@@ -1097,6 +1124,7 @@ async def delayed_channel_post(chat_id, media_files, text, buttons, lot_id):
         if lot_id in LOTS_CACHE:
             LOTS_CACHE[lot_id]['channel_msg_id'] = msg_id
             LOTS_CACHE[lot_id]['channel_text_msg_id'] = None  # Больше нет отдельного текста
+            save_lots_cache()
             logging.info(f"💾 Сохранен channel_msg_id={msg_id} для lot_id={lot_id}")
             
             # Обновляем кнопки менеджера с ссылкой на канал
@@ -1128,9 +1156,6 @@ async def update_manager_buttons_with_channel_link(lot_id, channel_msg_id):
     
         # Пересоздаем кнопки
         mgr_kb = InlineKeyboardBuilder()
-        
-        if chat_link: 
-            mgr_kb.button(text="🔗 Ссылка на чат", url=chat_link)
         
         mgr_kb.button(text="📹 Запросить видео", callback_data=f"req_video_{lot_id}")
         mgr_kb.button(text="✅ БЕРУТ", callback_data=f"client_buy_{lot_id}")
@@ -1170,12 +1195,90 @@ async def send_final(callback: types.CallbackQuery, state: FSMContext):
     # Проверяем, выбран ли клиент другого работника
     client_owner_id = data.get('client_owner_id', user_id)  # Используем ID владельца клиента
     
-    if is_multi:
+    # Проверяем режим "только канал"
+    channel_only = data.get('channel_only', False)
+    
+    if channel_only:
+        await send_to_channel_only(callback, state, user_id, worker_name, anketa_id, data)
+    elif is_multi:
         # Множественная отправка
         await send_to_multiple_clients(callback, state, user_id, worker_name, anketa_id, data, multi_clients, client_owner_id)
     else:
         # Обычная отправка одному клиенту
         await send_to_single_client(callback, state, user_id, worker_name, anketa_id, data, client_tag, client_owner_id)
+
+async def send_to_channel_only(callback, state, user_id, worker_name, anketa_id, data):
+    """Отправка анкеты только в канал (без клиентского чата)"""
+    start_kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🔄 Новые часы")]], resize_keyboard=True)
+    
+    public_text = (f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\n📢 Channel\n🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n💰 Discount: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n🪨 Material: {data.get('material', '—')}\n\n👀 Rating: {data.get('rating')}")
+    
+    manager_body = (f"🆔 <b>ID: {anketa_id}</b>\n👤 <b>От:</b> {worker_name}\n📢 <b>Только канал</b>\n💬 Manager: {data.get('manager_comment', '—')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n💰 Discount: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n🪨 Material: {data.get('material', '—')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
+    manager_text_final = f"🟢 <b>Status: Available</b>\n\n{manager_body}"
+    
+    db_save_full_order(user_id, worker_name, anketa_id, data)
+    lot_id = str(uuid.uuid4())[:8]
+    
+    # Отправляем ТОЛЬКО в канал (без чата клиента)
+    channel_buttons = get_channel_status_kb(lot_id)
+    if TARGET_CHANNEL_ID != 0:
+        asyncio.create_task(delayed_channel_post(TARGET_CHANNEL_ID, data.get("media_files"), public_text, channel_buttons, lot_id))
+    
+    # Кнопки для работника
+    worker_msg = await callback.message.answer(f"✅ <b>Отправлено в канал!</b>\n🆔 <b>ID: {anketa_id}</b>", reply_markup=start_kb, parse_mode="HTML")
+    
+    # Отправляем менеджерам
+    manager_msgs_info = []
+    try:
+        media_files = data.get("media_files", [])
+        for mgr_id in MANAGER_IDS:
+            try:
+                media_group = []
+                for item in media_files:
+                    if item['type'] == 'photo': media_group.append(InputMediaPhoto(media=item['id'], parse_mode="HTML"))
+                    elif item['type'] == 'video': media_group.append(InputMediaVideo(media=item['id'], parse_mode="HTML"))
+                
+                mgr_kb = InlineKeyboardBuilder()
+                mgr_kb.button(text="📹 Запросить видео", callback_data=f"req_video_{lot_id}")
+                mgr_kb.button(text="✅ БЕРУТ", callback_data=f"client_buy_{lot_id}")
+                mgr_kb.button(text="❌ Отказ", callback_data=f"reject_{lot_id}")
+                mgr_kb.button(text="💬 Коммент", callback_data=f"feedback_start_{lot_id}")
+                mgr_kb.button(text="🟢", callback_data=f"lot_status_available_{lot_id}")
+                mgr_kb.button(text="🟡", callback_data=f"lot_status_reserved_{lot_id}")
+                mgr_kb.button(text="🔴", callback_data=f"lot_status_sold_{lot_id}")
+                mgr_kb.adjust(1, 1, 1, 1, 3)
+                
+                if len(media_group) > 1:
+                    await bot.send_media_group(mgr_id, media=media_group)
+                    mgr_msg = await bot.send_message(mgr_id, manager_text_final, reply_markup=mgr_kb.as_markup(), parse_mode="HTML")
+                    msg_id = mgr_msg.message_id
+                else:
+                    if media_files[0]['type'] == 'photo': mgr_msg = await bot.send_photo(mgr_id, media_files[0]['id'], caption=manager_text_final, reply_markup=mgr_kb.as_markup(), parse_mode="HTML")
+                    else: mgr_msg = await bot.send_video(mgr_id, media_files[0]['id'], caption=manager_text_final, reply_markup=mgr_kb.as_markup(), parse_mode="HTML")
+                    msg_id = mgr_msg.message_id
+                manager_msgs_info.append({'chat_id': mgr_id, 'msg_id': msg_id})
+            except Exception as e: logging.error(f"Не удалось отправить менеджеру {mgr_id}: {e}")
+    except Exception as e: await callback.message.answer(f"❌ Ошибка отправки: {e}")
+    
+    LOTS_CACHE[lot_id] = {
+        "media_files": data.get("media_files"),
+        "clean_text": public_text.replace("🟢 <b>Status: Available</b>\n\n", ""),
+        "manager_body": manager_body,
+        "user_id": user_id,
+        "target_client_id": None,
+        "client_tag": "📢 Channel",
+        "worker_msg_id": worker_msg.message_id,
+        "worker_name": worker_name,
+        "channel_msg_id": None,
+        "channel_text_msg_id": None,
+        "chat_msg_id": None,
+        "chat_text_msg_id": None,
+        "manager_msgs": manager_msgs_info
+    }
+    save_lots_cache()
+    logging.info(f"💾 Сохранен lot_id={lot_id} (только канал)")
+    
+    await state.clear()
 
 async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa_id, data, multi_clients, client_owner_id):
     """Отправка анкеты нескольким клиентам"""
@@ -1222,30 +1325,10 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
             logging.error(f"❌ Ошибка отправки {client_tag}: {e}")
     
     # Ссылки на чаты для работника
-    worker_links_kb = InlineKeyboardBuilder()
-    for cm in all_chat_messages:
-        cl_chat_id = cm.get("chat_id")
-        cl_msg_id = cm.get("msg_id")
-        cl_link = await make_chat_link(cl_chat_id, cl_msg_id)
-        if cl_link:
-            # Найдём тег клиента по chat_id
-            tag = "Чат"
-            for ct in multi_clients:
-                if get_client_group_chat(client_owner_id, ct) == cl_chat_id:
-                    tag = ct
-                    break
-            worker_links_kb.button(text=f"🔗 {tag}", url=cl_link)
-    # Для Vladyslav — всегда добавляем кнопку на основной чат
-    if client_owner_id == 645070075:
-        vlad_link = await make_chat_link(-5257627627)
-        if vlad_link:
-            worker_links_kb.button(text="🔗 Основной чат", url=vlad_link)
-    worker_links_kb.adjust(2)
-    if all_chat_messages:
-        await callback.message.answer(f"📍 Анкета отправлена в {len(multi_clients)} чатов:", reply_markup=worker_links_kb.as_markup(), parse_mode="HTML")
+    await callback.message.answer(f"📍 Анкета отправлена в {len(multi_clients)} чатов.", parse_mode="HTML")
 
     # Отправляем менеджеру сводку
-    manager_body = (f"🆔 <b>ID: {anketa_id}</b>\n👤 <b>От:</b> {worker_name}\n🏷 <b>Клиенты:</b> {clients_display}\n📱 Seller: {data.get('seller_number')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n💰 Discount: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n🪨 Material: {data.get('material', '—')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
+    manager_body = (f"🆔 <b>ID: {anketa_id}</b>\n👤 <b>От:</b> {worker_name}\n🏷 <b>Клиенты:</b> {clients_display}\n💬 Manager: {data.get('manager_comment', '—')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n💰 Discount: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n🪨 Material: {data.get('material', '—')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
     manager_text_final = f"🟢 <b>Status: Available</b>\n\n{manager_body}\n\n📤 <b>Отправлено {len(multi_clients)} клиентам</b>"
     
     # Генерируем ссылку на первый групповой чат
@@ -1254,9 +1337,6 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
     
     # Создаем кнопки для менеджера
     mgr_kb = InlineKeyboardBuilder()
-    
-    if chat_link: 
-        mgr_kb.button(text="🔗 Ссылка на чат", url=chat_link)
     
     mgr_kb.button(text="📹 Запросить видео", callback_data=f"req_video_{main_lot_id}")
     mgr_kb.button(text="✅ БЕРУТ", callback_data=f"client_buy_{main_lot_id}")
@@ -1316,6 +1396,7 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
         "all_chat_messages": all_chat_messages,
         "manager_msgs": manager_msgs_info
     }
+    save_lots_cache()
     logging.info(f"💾 Сохранен lot_id={main_lot_id} для множественной отправки ({len(all_chat_messages)} чатов)")
     
     db_save_full_order(user_id, worker_name, anketa_id, data)
@@ -1329,7 +1410,7 @@ async def send_to_single_client(callback, state, user_id, worker_name, anketa_id
     if target_client_id and isinstance(target_client_id, int):
         client_link_text = f'<a href="tg://user?id={target_client_id}">{client_tag}</a>'
 
-    manager_body = (f"🆔 <b>ID: {anketa_id}</b>\n👤 <b>От:</b> {worker_name}\n🏷 <b>Клиент:</b> {client_link_text}-{data.get('table')}\n📱 Seller: {data.get('seller_number')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n💰 Discount: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n🪨 Material: {data.get('material', '—')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
+    manager_body = (f"🆔 <b>ID: {anketa_id}</b>\n👤 <b>От:</b> {worker_name}\n🏷 <b>Клиент:</b> {client_link_text}-{data.get('table')}\n💬 Manager: {data.get('manager_comment', '—')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n💰 Discount: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n🪨 Material: {data.get('material', '—')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
     manager_text_final = f"🟢 <b>Status: Available</b>\n\n{manager_body}"
 
     public_text = (f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\nClient {client_tag}-{data.get('table')}\n🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n💰 Discount: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n🪨 Material: {data.get('material', '—')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=8548264779\">Contact Manager</a>")
@@ -1350,22 +1431,9 @@ async def send_to_single_client(callback, state, user_id, worker_name, anketa_id
     start_kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🔄 Новые часы")]], resize_keyboard=True)
     worker_msg = await callback.message.answer(f"✅ <b>Отправлено!</b>\n🆔 <b>ID: {anketa_id}</b>", reply_markup=start_kb, parse_mode="HTML")
     
-    worker_link_kb = InlineKeyboardBuilder()
-    if chat_link:
-        worker_link_kb.button(text=f"🔗 Чат {client_tag}", url=chat_link)
-    # Для Vladyslav — всегда добавляем кнопку на основной чат
-    if client_owner_id == 645070075:
-        vlad_link = await make_chat_link(-5257627627)
-        if vlad_link:
-            worker_link_kb.button(text="🔗 Основной чат", url=vlad_link)
-    if worker_link_kb._buttons:
-        await callback.message.answer(f"📍 Анкета отправлена в чат <b>{client_tag}</b>", reply_markup=worker_link_kb.as_markup(), parse_mode="HTML")
 
     # СБОРКА КНОПОК ДЛЯ МЕНЕДЖЕРА
     mgr_kb = InlineKeyboardBuilder()
-    
-    if chat_link: 
-        mgr_kb.button(text="🔗 Ссылка на чат", url=chat_link)
     
     mgr_kb.button(text="📹 Запросить видео", callback_data=f"req_video_{lot_id}")
     mgr_kb.button(text="✅ БЕРУТ", callback_data=f"client_buy_{lot_id}")
@@ -1420,6 +1488,7 @@ async def send_to_single_client(callback, state, user_id, worker_name, anketa_id
         "chat_text_msg_id": chat_text_msg_id,
         "manager_msgs": manager_msgs_info
     }
+    save_lots_cache()
     logging.info(f"💾 Сохранен lot_id={lot_id} в LOTS_CACHE")
 
     await state.clear()
@@ -1550,8 +1619,6 @@ async def change_status_unified(callback: types.CallbackQuery):
     chat_link = await make_chat_link(actual_chat_id, chat_msg_id)
     
     mgr_kb = InlineKeyboardBuilder()
-    
-    if chat_link: mgr_kb.button(text="🔗 Ссылка на чат", url=chat_link)
     
     mgr_kb.button(text="📹 Запросить видео", callback_data=f"req_video_{lot_id}")
     mgr_kb.button(text="✅ БЕРУТ", callback_data=f"client_buy_{lot_id}")
@@ -1705,7 +1772,8 @@ async def new_cycle(m: types.Message, state: FSMContext): await restart_logic(m,
 
 async def main():
     init_db() # АВТО-ЗАПУСК СОЗДАНИЯ ТАБЛИЦ
-    print("🚀 Бот запущен (Версия 103: Fixed Links & Buttons) ...")
+    load_lots_cache()  # Загрузка кэша лотов после перезапуска
+    logging.info("Bot started (v104: Persistent LOTS_CACHE)")
     await user_client.start(); await dp.start_polling(bot)
 
 if __name__ == "__main__": asyncio.run(main())
