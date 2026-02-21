@@ -537,9 +537,15 @@ async def show_client_menu(message: types.Message, user_id=None):
         if user_id in MANAGER_IDS: pass
         else: await message.answer("⚠️ Нет клиентов."); return
     
-    # Добавляем кнопку для множественного выбора + канал
-    clients_list.append("📢 Канал")
-    kb = make_kb(clients_list, rows=3, back=False, skip=False, done_text="📋 Несколько клиентов") 
+    # Создаём клавиатуру с клиентами + нижний ряд: Канал + Несколько клиентов
+    kb_rows = []
+    row = []
+    for btn in clients_list:
+        row.append(KeyboardButton(text=btn))
+        if len(row) == 3: kb_rows.append(row); row = []
+    if row: kb_rows.append(row)
+    kb_rows.append([KeyboardButton(text="📢 Канал"), KeyboardButton(text="📋 Несколько клиентов")])
+    kb = ReplyKeyboardMarkup(keyboard=kb_rows, resize_keyboard=True, is_persistent=True)
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id)
     await fsm.set_state(Form.choosing_client)
     await message.answer("1️⃣ <b>Выбери клиента:</b>", reply_markup=kb, parse_mode="HTML")
