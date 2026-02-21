@@ -994,8 +994,8 @@ async def show_final_review(message: types.Message, state: FSMContext):
         builder.button(text="📢 ОТПРАВИТЬ В КАНАЛ", callback_data="send_final")
         builder.adjust(1)
     else:
-        builder.button(text="📢 В КАНАЛ И ГРУППУ", callback_data="send_final")
-        builder.button(text="💬 ТОЛЬКО В ГРУППУ", callback_data="send_group_only")
+        builder.button(text="📢 В КАНАЛ И ЧАТ", callback_data="send_final")
+        builder.button(text="💬 ТОЛЬКО В ЧАТ", callback_data="send_group_only")
         builder.adjust(1, 2)
     msg = await message.answer("Загружаю анкету...", reply_markup=ReplyKeyboardRemove()); await msg.delete()
     media_files = data.get("media_files", [])
