@@ -459,6 +459,41 @@ async def make_chat_link(chat_id, msg_id=None):
             return f"tg://privatepost?channel={clean}&post={msg_id}"
         return f"https://t.me/c/{clean}"
 
+def format_client_table(tag, table):
+    """Форматирует клиент-стол, скрывая стол если пропущен"""
+    if table and str(table) != '—':
+        return f"{tag}-{table}"
+    return str(tag)
+
+def build_anketa_fields(data, chrono_label="Chrono", include_manager=False, include_rating=True, bold_rating=False):
+    """Построение полей анкеты — пропускает поля со значением '—'"""
+    lines = []
+    if include_manager:
+        v = data.get('manager_comment', '—')
+        if v and v != '—':
+            lines.append(f"💬 Manager: {v}")
+    for label, val, prefix, suffix in [
+        ("💶 Price", data.get('price'), "€", ""),
+        (f"📉 {chrono_label}", data.get('chrono_price'), "€", ""),
+        ("💰 Discount", data.get('negotiation'), "", ""),
+        ("📅 Year", data.get('year'), "", ""),
+        ("📏 Diam", data.get('diameter'), "", " mm"),
+        ("🖐 Wrist", data.get('wrist'), "", " cm"),
+        ("📦 Set", data.get('kit'), "", ""),
+        ("⚙️ Cond", data.get('condition'), "", ""),
+        ("🪨 Material", data.get('material', '—'), "", ""),
+    ]:
+        if val and str(val) != '—':
+            lines.append(f"{label}: {prefix}{val}{suffix}")
+    if include_rating:
+        v = data.get('rating', '—')
+        if v and v != '—':
+            if bold_rating:
+                lines.append(f"\n👀 <b>Rating:</b> {v}")
+            else:
+                lines.append(f"\n👀 Rating: {v}")
+    return '\n'.join(lines)
+
 def get_channel_status_kb(lot_id):
     builder = InlineKeyboardBuilder()
     builder.row(
@@ -944,8 +979,18 @@ async def process_rating(message: types.Message, state: FSMContext):
 async def show_final_review(message: types.Message, state: FSMContext):
     await state.update_data(editing_mode=False)
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id); await fsm.set_state(Form.final_review); data = await state.get_data()
-    text = (f"📋 <b>ПРОВЕРКА (Вид для клиента):</b>\n\n👤 Client: {data.get('client')}-{data.get('table')}\n💬 Manager: {data.get('manager_comment', '—')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n💰 Discount: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n🪨 Material: {data.get('material', '—')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
-    builder = InlineKeyboardBuilder(); builder.button(text="✏️ Изменить", callback_data="open_edit_menu"); builder.button(text="✅ ОТПРАВИТЬ МЕНЕДЖЕРУ", callback_data="send_final"); builder.adjust(1)
+    ct = format_client_table(data.get('client'), data.get('table'))
+    fields = build_anketa_fields(data, chrono_label="Chrono", include_manager=True, include_rating=True, bold_rating=True)
+    text = f"📋 <b>ПРОВЕРКА (Вид для клиента):</b>\n\n👤 Client: {ct}\n{fields}"
+    builder = InlineKeyboardBuilder()
+    builder.button(text="✏️ Изменить", callback_data="open_edit_menu")
+    if data.get('channel_only'):
+        builder.button(text="📢 ОТПРАВИТЬ В КАНАЛ", callback_data="send_final")
+        builder.adjust(1)
+    else:
+        builder.button(text="📢 В КАНАЛ И ГРУППУ", callback_data="send_final")
+        builder.button(text="💬 ТОЛЬКО В ГРУППУ", callback_data="send_group_only")
+        builder.adjust(1, 2)
     msg = await message.answer("Загружаю анкету...", reply_markup=ReplyKeyboardRemove()); await msg.delete()
     media_files = data.get("media_files", [])
     if len(media_files) > 0:
@@ -1048,14 +1093,14 @@ async def broadcast_to_channels_chat_only(media_files, text, specific_chat_id, l
             
     return None, chat_msg_id, chat_text_msg_id
 
-async def broadcast_to_channels(media_files, text, lot_id, specific_chat_id):
+async def broadcast_to_channels(media_files, text, lot_id, specific_chat_id, skip_channel=False):
     """Отправляет пост в Канал (отложенно) и В КОНКРЕТНЫЙ ЧАТ (сразу)"""
     channel_buttons = get_channel_status_kb(lot_id)
     chat_msg_id = None
     chat_text_msg_id = None
     
     # 1. ОТЛОЖЕННАЯ ОТПРАВКА В ОБЩИЙ КАНАЛ
-    if TARGET_CHANNEL_ID != 0:
+    if TARGET_CHANNEL_ID != 0 and not skip_channel:
         asyncio.create_task(delayed_channel_post(TARGET_CHANNEL_ID, media_files, text, channel_buttons, lot_id))
 
     # 2. МГНОВЕННАЯ ОТПРАВКА В ЦЕЛЕВОЙ ЧАТ
@@ -1183,10 +1228,13 @@ async def update_manager_buttons_with_channel_link(lot_id, channel_msg_id):
     except Exception as e:
         print(f"❌ Ошибка обновления кнопок менеджера: {e}")
 
-@dp.callback_query(F.data == "send_final")
+@dp.callback_query(F.data.in_({"send_final", "send_group_only"}))
 async def send_final(callback: types.CallbackQuery, state: FSMContext):
     data = await state.get_data(); user_id = callback.from_user.id
     anketa_id = db_get_next_id(user_id); worker_name = db_check_worker(user_id); client_tag = data.get('client')
+    
+    # Проверяем режим: только группа (без канала)
+    group_only = callback.data == "send_group_only"
     
     # Проверяем режим множественного выбора
     multi_clients = data.get('multi_clients', [])
@@ -1202,18 +1250,20 @@ async def send_final(callback: types.CallbackQuery, state: FSMContext):
         await send_to_channel_only(callback, state, user_id, worker_name, anketa_id, data)
     elif is_multi:
         # Множественная отправка
-        await send_to_multiple_clients(callback, state, user_id, worker_name, anketa_id, data, multi_clients, client_owner_id)
+        await send_to_multiple_clients(callback, state, user_id, worker_name, anketa_id, data, multi_clients, client_owner_id, skip_channel=group_only)
     else:
         # Обычная отправка одному клиенту
-        await send_to_single_client(callback, state, user_id, worker_name, anketa_id, data, client_tag, client_owner_id)
+        await send_to_single_client(callback, state, user_id, worker_name, anketa_id, data, client_tag, client_owner_id, skip_channel=group_only)
 
 async def send_to_channel_only(callback, state, user_id, worker_name, anketa_id, data):
     """Отправка анкеты только в канал (без клиентского чата)"""
     start_kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🔄 Новые часы")]], resize_keyboard=True)
     
-    public_text = (f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\n📢 Channel\n🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n💰 Discount: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n🪨 Material: {data.get('material', '—')}\n\n👀 Rating: {data.get('rating')}")
+    pub_fields = build_anketa_fields(data, chrono_label="Market Price (Chrono24)", include_manager=False, include_rating=True, bold_rating=False)
+    public_text = f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\n📢 Channel\n🆔 <b>ID: {anketa_id}</b>\n{pub_fields}"
     
-    manager_body = (f"🆔 <b>ID: {anketa_id}</b>\n👤 <b>От:</b> {worker_name}\n📢 <b>Только канал</b>\n💬 Manager: {data.get('manager_comment', '—')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n💰 Discount: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n🪨 Material: {data.get('material', '—')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
+    mgr_fields = build_anketa_fields(data, chrono_label="Chrono", include_manager=True, include_rating=True, bold_rating=True)
+    manager_body = f"🆔 <b>ID: {anketa_id}</b>\n👤 <b>От:</b> {worker_name}\n📢 <b>Только канал</b>\n{mgr_fields}"
     manager_text_final = f"🟢 <b>Status: Available</b>\n\n{manager_body}"
     
     db_save_full_order(user_id, worker_name, anketa_id, data)
@@ -1280,7 +1330,7 @@ async def send_to_channel_only(callback, state, user_id, worker_name, anketa_id,
     
     await state.clear()
 
-async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa_id, data, multi_clients, client_owner_id):
+async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa_id, data, multi_clients, client_owner_id, skip_channel=False):
     """Отправка анкеты нескольким клиентам"""
     start_kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🔄 Новые часы")]], resize_keyboard=True)
     
@@ -1294,7 +1344,9 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
     first_client_tag = multi_clients[0]
     target_client_id = get_client_id(client_owner_id, first_client_tag)
     
-    clean_text = (f"👤 <b>{worker_name}</b>\nClient {first_client_tag}-{data.get('table')}\n🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n💰 Discount: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n🪨 Material: {data.get('material', '—')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=8548264779\">Contact Manager</a>")
+    ct = format_client_table(first_client_tag, data.get('table'))
+    pub_fields = build_anketa_fields(data, chrono_label="Market Price (Chrono24)", include_manager=False, include_rating=True, bold_rating=False)
+    clean_text = f"👤 <b>{worker_name}</b>\nClient {ct}\n🆔 <b>ID: {anketa_id}</b>\n{pub_fields}\n\n📞 <a href=\"tg://user?id=8548264779\">Contact Manager</a>"
     
     # Отправляем в каждый чат клиента        
     first_chat_msg_id = None
@@ -1306,12 +1358,13 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
         # Получаем групповой чат для каждого клиента
         actual_chat_id = get_client_group_chat(client_owner_id, client_tag)
         
-        public_text = (f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\nClient {client_tag}-{data.get('table')}\n🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n💰 Discount: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n🪨 Material: {data.get('material', '—')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=8548264779\">Contact Manager</a>")
+        ct_loop = format_client_table(client_tag, data.get('table'))
+        public_text = f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\nClient {ct_loop}\n🆔 <b>ID: {anketa_id}</b>\n{pub_fields}\n\n📞 <a href=\"tg://user?id=8548264779\">Contact Manager</a>"
         
         try:
             # Используем main_lot_id только для ПЕРВОГО клиента (для канала), остальным отправляем только в чат
             if is_first:
-                _, chat_msg_id, chat_text_msg_id = await broadcast_to_channels(data.get("media_files"), public_text, main_lot_id, actual_chat_id)
+                _, chat_msg_id, chat_text_msg_id = await broadcast_to_channels(data.get("media_files"), public_text, main_lot_id, actual_chat_id, skip_channel=skip_channel)
                 first_chat_msg_id = chat_msg_id
                 first_chat_text_msg_id = chat_text_msg_id
                 is_first = False
@@ -1328,7 +1381,8 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
     await callback.message.answer(f"📍 Анкета отправлена в {len(multi_clients)} чатов.", parse_mode="HTML")
 
     # Отправляем менеджеру сводку
-    manager_body = (f"🆔 <b>ID: {anketa_id}</b>\n👤 <b>От:</b> {worker_name}\n🏷 <b>Клиенты:</b> {clients_display}\n💬 Manager: {data.get('manager_comment', '—')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n💰 Discount: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n🪨 Material: {data.get('material', '—')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
+    mgr_fields = build_anketa_fields(data, chrono_label="Chrono", include_manager=True, include_rating=True, bold_rating=True)
+    manager_body = f"🆔 <b>ID: {anketa_id}</b>\n👤 <b>От:</b> {worker_name}\n🏷 <b>Клиенты:</b> {clients_display}\n{mgr_fields}"
     manager_text_final = f"🟢 <b>Status: Available</b>\n\n{manager_body}\n\n📤 <b>Отправлено {len(multi_clients)} клиентам</b>"
     
     # Генерируем ссылку на первый групповой чат
@@ -1402,7 +1456,7 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
     db_save_full_order(user_id, worker_name, anketa_id, data)
     await state.clear()
 
-async def send_to_single_client(callback, state, user_id, worker_name, anketa_id, data, client_tag, client_owner_id):
+async def send_to_single_client(callback, state, user_id, worker_name, anketa_id, data, client_tag, client_owner_id, skip_channel=False):
     """Отправка анкеты одному клиенту"""
     target_client_id = get_client_id(client_owner_id, client_tag)
     
@@ -1410,11 +1464,15 @@ async def send_to_single_client(callback, state, user_id, worker_name, anketa_id
     if target_client_id and isinstance(target_client_id, int):
         client_link_text = f'<a href="tg://user?id={target_client_id}">{client_tag}</a>'
 
-    manager_body = (f"🆔 <b>ID: {anketa_id}</b>\n👤 <b>От:</b> {worker_name}\n🏷 <b>Клиент:</b> {client_link_text}-{data.get('table')}\n💬 Manager: {data.get('manager_comment', '—')}\n💶 Price: €{data.get('price')}\n📉 Chrono: €{data.get('chrono_price')}\n💰 Discount: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n🪨 Material: {data.get('material', '—')}\n\n👀 <b>Rating:</b> {data.get('rating')}")
+    ct_mgr = format_client_table(client_link_text, data.get('table'))
+    mgr_fields = build_anketa_fields(data, chrono_label="Chrono", include_manager=True, include_rating=True, bold_rating=True)
+    manager_body = f"🆔 <b>ID: {anketa_id}</b>\n👤 <b>От:</b> {worker_name}\n🏷 <b>Клиент:</b> {ct_mgr}\n{mgr_fields}"
     manager_text_final = f"🟢 <b>Status: Available</b>\n\n{manager_body}"
 
-    public_text = (f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\nClient {client_tag}-{data.get('table')}\n🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n💰 Discount: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n🪨 Material: {data.get('material', '—')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=8548264779\">Contact Manager</a>")
-    clean_text = (f"👤 <b>{worker_name}</b>\nClient {client_tag}-{data.get('table')}\n🆔 <b>ID: {anketa_id}</b>\n💶 Price: €{data.get('price')}\n📉 Market Price (Chrono24): €{data.get('chrono_price')}\n💰 Discount: {data.get('negotiation')}\n📅 Year: {data.get('year')}\n📏 Diam: {data.get('diameter')} mm\n🖐 Wrist: {data.get('wrist')} cm\n📦 Set: {data.get('kit')}\n⚙️ Cond: {data.get('condition')}\n🪨 Material: {data.get('material', '—')}\n\n👀 Rating: {data.get('rating')}\n\n📞 <a href=\"tg://user?id=8548264779\">Contact Manager</a>")
+    ct = format_client_table(client_tag, data.get('table'))
+    pub_fields = build_anketa_fields(data, chrono_label="Market Price (Chrono24)", include_manager=False, include_rating=True, bold_rating=False)
+    public_text = f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\nClient {ct}\n🆔 <b>ID: {anketa_id}</b>\n{pub_fields}\n\n📞 <a href=\"tg://user?id=8548264779\">Contact Manager</a>"
+    clean_text = f"👤 <b>{worker_name}</b>\nClient {ct}\n🆔 <b>ID: {anketa_id}</b>\n{pub_fields}\n\n📞 <a href=\"tg://user?id=8548264779\">Contact Manager</a>"
 
     db_save_full_order(user_id, worker_name, anketa_id, data)
     lot_id = str(uuid.uuid4())[:8]
@@ -1422,7 +1480,7 @@ async def send_to_single_client(callback, state, user_id, worker_name, anketa_id
     # Получаем групповой чат для этого клиента (используем владельца клиента)
     actual_chat_id = get_client_group_chat(client_owner_id, client_tag)
     
-    _, chat_msg_id, chat_text_msg_id = await broadcast_to_channels(data.get("media_files"), public_text, lot_id, actual_chat_id)
+    _, chat_msg_id, chat_text_msg_id = await broadcast_to_channels(data.get("media_files"), public_text, lot_id, actual_chat_id, skip_channel=skip_channel)
 
     # ГЕНЕРАЦИЯ ССЫЛКИ НА ЧАТ
     chat_link = await make_chat_link(actual_chat_id, chat_msg_id)
