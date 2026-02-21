@@ -126,7 +126,7 @@ EMPLOYEES_CONFIG = {
             "#111": {"group_chat_id": -5176219649},
             "#120": {"group_chat_id": -5275969573},
             "#124": {"group_chat_id": -5121925059},
-            "#136": {"group_chat_id": -5295466035},
+            "#136": {"group_chat_id": -5075946318},
             "Toy14": {"group_chat_id": -5126299598},
             "Toy20": {"group_chat_id": -5250147547},
             "Toy26": {"group_chat_id": -5256884020},
