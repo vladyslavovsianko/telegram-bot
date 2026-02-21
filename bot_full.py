@@ -1454,7 +1454,76 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
     logging.info(f"💾 Сохранен lot_id={main_lot_id} для множественной отправки ({len(all_chat_messages)} чатов)")
     
     db_save_full_order(user_id, worker_name, anketa_id, data)
+    
+    # Предлагаем повторить отправку тем же клиентам (только для 2+ клиентов)
+    if len(multi_clients) >= 2:
+        await state.clear()
+        await state.update_data(repeat_clients=multi_clients, repeat_owner_id=client_owner_id)
+        repeat_kb = InlineKeyboardBuilder()
+        repeat_kb.button(text="🔁 Новая анкета тем же клиентам", callback_data="repeat_same_clients")
+        for i, cl in enumerate(multi_clients):
+            repeat_kb.button(text=f"❌ {cl}", callback_data=f"repeat_remove_{i}")
+        repeat_kb.adjust(1)
+        await callback.message.answer(
+            f"📋 <b>Клиенты:</b> {', '.join(multi_clients)}\n\nОтправить новую анкету тем же клиентам?",
+            reply_markup=repeat_kb.as_markup(), parse_mode="HTML"
+        )
+    else:
+        await state.clear()
+
+@dp.callback_query(F.data == "repeat_same_clients")
+async def repeat_same_clients(callback: types.CallbackQuery, state: FSMContext):
+    """Начать новую анкету для тех же клиентов"""
+    data = await state.get_data()
+    clients = data.get('repeat_clients', [])
+    owner_id = data.get('repeat_owner_id')
+    if not clients or len(clients) < 1:
+        await callback.answer("⚠️ Нет клиентов для повтора", show_alert=True)
+        return
+    await callback.message.delete()
     await state.clear()
+    await state.update_data(
+        media_files=[], editing_mode=False,
+        multi_clients=clients, client=", ".join(clients),
+        multi_mode=False, client_owner_id=owner_id
+    )
+    fsm = dp.fsm.get_context(bot, callback.message.chat.id, callback.message.chat.id)
+    await fsm.set_state(Form.uploading_media)
+    await callback.message.answer(
+        f"📸 <b>Загрузи фото/видео для новой анкеты</b>\n👥 Клиенты: {', '.join(clients)}",
+        reply_markup=make_kb([], rows=1, back=True, done_text="✅ Все файлы загружены", skip=False),
+        parse_mode="HTML"
+    )
+
+@dp.callback_query(F.data.startswith("repeat_remove_"))
+async def repeat_remove_client(callback: types.CallbackQuery, state: FSMContext):
+    """Удалить клиента из списка повторной отправки"""
+    data = await state.get_data()
+    clients = list(data.get('repeat_clients', []))
+    owner_id = data.get('repeat_owner_id')
+    idx = int(callback.data.split("_")[-1])
+    if idx < 0 or idx >= len(clients):
+        await callback.answer("⚠️ Ошибка", show_alert=True)
+        return
+    removed = clients.pop(idx)
+    await state.update_data(repeat_clients=clients)
+    if len(clients) == 0:
+        await callback.message.delete()
+        await callback.answer(f"❌ Все клиенты удалены")
+        await state.clear()
+        return
+    # Обновляем кнопки
+    repeat_kb = InlineKeyboardBuilder()
+    if len(clients) >= 1:
+        repeat_kb.button(text="🔁 Новая анкета тем же клиентам", callback_data="repeat_same_clients")
+    for i, cl in enumerate(clients):
+        repeat_kb.button(text=f"❌ {cl}", callback_data=f"repeat_remove_{i}")
+    repeat_kb.adjust(1)
+    await callback.message.edit_text(
+        f"📋 <b>Клиенты:</b> {', '.join(clients)}\n\nОтправить новую анкету тем же клиентам?",
+        reply_markup=repeat_kb.as_markup(), parse_mode="HTML"
+    )
+    await callback.answer(f"❌ {removed} удален")
 
 async def send_to_single_client(callback, state, user_id, worker_name, anketa_id, data, client_tag, client_owner_id, skip_channel=False):
     """Отправка анкеты одному клиенту"""
