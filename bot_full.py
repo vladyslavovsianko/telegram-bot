@@ -101,18 +101,18 @@ EMPLOYEES_CONFIG = {
     645070075: {  # Vladyslav
         "clients": {
             "#96": {"group_chat_id": -5238109092},
-            "#137": {"group_chat_id": 1000000000},
-            "#140": {"group_chat_id": 1000000000},
-            "#145": {"group_chat_id": 1000000000},
-            "#148": {"group_chat_id": 1000000000},
+            "#137": {"group_chat_id": -5265690494},
+            "#140": {"group_chat_id": -5102101973},
+            "#145": {"group_chat_id": -5101810449},
+            "#148": {"group_chat_id": -5247473724},
             "Toy17": {"group_chat_id": -4995762095},
-            "Toy21": {"group_chat_id": 1000000000},
+            "Toy21": {"group_chat_id": -5291979002},
             "Toy23": {"group_chat_id": -5142004346},
             "Toy40": {"group_chat_id": -5229699686},
-            "Toy44": {"group_chat_id": 1000000000},
-            "Toy46": {"group_chat_id": 1000000000},
-            "Toy67": {"group_chat_id": 1000000000},
-            "Toy74": {"group_chat_id": 1000000000}
+            "Toy44": {"group_chat_id": -5086915437},
+            "Toy46": {"group_chat_id": -5173644458},
+            "Toy67": {"group_chat_id": -5234402500},
+            "Toy74": {"group_chat_id": -5287917185}
         }
     },
     625971673: {  # Виталий
@@ -125,53 +125,52 @@ EMPLOYEES_CONFIG = {
             "#99": {"group_chat_id": -5033105513},
             "#107": {"group_chat_id": -5180230828},
             "#111": {"group_chat_id": -5176219649},
-            "#113": {"group_chat_id": 1000000000},
+            "#113": {"group_chat_id": -5212526001},
             "#124": {"group_chat_id": -5121925059},
-            "#131": {"group_chat_id": 1000000000},
-            "#139": {"group_chat_id": 1000000000},
-            "#146": {"group_chat_id": 1000000000},
+            "#131": {"group_chat_id": -5291287861},
+            "#139": {"group_chat_id": -5143478306},
+            "#146": {"group_chat_id": -5242427630},
             "Toy26": {"group_chat_id": -5256884020},
             "Toy27": {"group_chat_id": -5251521211},
             "Toy31": {"group_chat_id": -5239027986},
             "Toy34": {"group_chat_id": -5278523032},
             "Toy38": {"group_chat_id": -5200145003},
-            "Toy49": {"group_chat_id": 1000000000},
-            "Toy55": {"group_chat_id": 1000000000},
-            "Toy59": {"group_chat_id": 1000000000},
-            "Toy60": {"group_chat_id": 1000000000},
-            "Toy73": {"group_chat_id": 1000000000}
+            "Toy49": {"group_chat_id": -5267417206},
+            "Toy55": {"group_chat_id": -5117908085},
+            "Toy59": {"group_chat_id": -5298602440},
+            "Toy60": {"group_chat_id": -5298774186},
+            "Toy73": {"group_chat_id": -5021649061}
         }
     },
     5442618444: {  # Миша K
         "clients": {
             "#94": {"group_chat_id": -5217474814},
             "#98": {"group_chat_id": -4968185056},
-            "#101": {"group_chat_id": 1000000000},
-            "#103": {"group_chat_id": 1000000000},
+            "#101": {"group_chat_id": -5291170403},
+            "#103": {"group_chat_id": -5233036184},
             "#110": {"group_chat_id": -5157805999},
-            "#117": {"group_chat_id": 1000000000},
+            "#117": {"group_chat_id": -5105853553},
             "#118": {"group_chat_id": -5188694886},
             "#122": {"group_chat_id": -5256550803},
-            "#125": {"group_chat_id": 1000000000},
+            "#125": {"group_chat_id": -5156346053},
             "#127": {"group_chat_id": -5113224392},
-            "#142": {"group_chat_id": 1000000000},
-            "#144": {"group_chat_id": 1000000000},
-            "#147": {"group_chat_id": 1000000000},
+            "#142": {"group_chat_id": -5193651565},
+            "#144": {"group_chat_id": -5294989828},
+            "#147": {"group_chat_id": -5157970276},
             "Toy8": {"group_chat_id": -5143325351},
             "Toy32": {"group_chat_id": -5207210520},
             "Toy41": {"group_chat_id": -5163315891},
-            "Toy49": {"group_chat_id": 1000000000},
-            "Toy56": {"group_chat_id": 1000000000},
-            "Toy75": {"group_chat_id": 1000000000},
-            "Toy76": {"group_chat_id": 1000000000},
-            "Старі": {"group_chat_id": 1000000000}
+            "Toy49": {"group_chat_id": -5267417206},
+            "Toy56": {"group_chat_id": -5164434247},
+            "Toy75": {"group_chat_id": -5267574631},
+            "Toy76": {"group_chat_id": -5115911386},
         }
     },
     419890021: {  # Олег
         "clients": {
-            "#58": {"group_chat_id": 1000000000},
-            "#132": {"group_chat_id": 1000000000},
-            "#143": {"group_chat_id": 1000000000}
+            "#58": {"group_chat_id": -5227727762},
+            "#132": {"group_chat_id": -5155828206},
+            "#143": {"group_chat_id": -5217200978}
         }
     },
     6776561610: {  # Misha M (2)
@@ -182,20 +181,20 @@ EMPLOYEES_CONFIG = {
             "#121": {"group_chat_id": -5221766017},
             "#126": {"group_chat_id": -4758469868},
             "#128": {"group_chat_id": -5250840602},
-            "#133": {"group_chat_id": 1000000000},
-            "#134": {"group_chat_id": 1000000000},
-            "#138": {"group_chat_id": 1000000000},
-            "#141": {"group_chat_id": 1000000000},
-            "#149": {"group_chat_id": 1000000000},
+            "#133": {"group_chat_id": -5125987879},
+            "#134": {"group_chat_id": -5157432882},
+            "#138": {"group_chat_id": -5264463337},
+            "#141": {"group_chat_id": -5199206222},
+            "#149": {"group_chat_id": -5290810666},
             "Toy42": {"group_chat_id": -5299629678},
-            "Toy49": {"group_chat_id": 1000000000},
-            "Toy50": {"group_chat_id": 1000000000},
-            "Toy61": {"group_chat_id": 1000000000},
-            "Toy63": {"group_chat_id": 1000000000},
-            "Toy64": {"group_chat_id": 1000000000},
-            "Toy68": {"group_chat_id": 1000000000},
-            "Toy78": {"group_chat_id": 1000000000},
-            "Toy79": {"group_chat_id": 1000000000}
+            "Toy49": {"group_chat_id": -5267417206},
+            "Toy50": {"group_chat_id": -5187555997},
+            "Toy61": {"group_chat_id": -5139479896},
+            "Toy63": {"group_chat_id": -5205007325},
+            "Toy64": {"group_chat_id": -5174345325},
+            "Toy68": {"group_chat_id": -5245264756},
+            "Toy78": {"group_chat_id": -5101378007},
+            "Toy79": {"group_chat_id": -5143216107}
         }
     }
 }
