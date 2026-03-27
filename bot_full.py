@@ -112,6 +112,7 @@ EMPLOYEES_CONFIG = {
             "Toy44": {"group_chat_id": -5086915437},
             "Toy46": {"group_chat_id": -5173644458},
             "Toy67": {"group_chat_id": -5234402500},
+            "#151": {"group_chat_id": -5179525022},
             "Toy74": {"group_chat_id": -5287917185}
         }
     },
@@ -169,8 +170,28 @@ EMPLOYEES_CONFIG = {
     419890021: {  # Олег
         "clients": {
             "#58": {"group_chat_id": -5227727762},
+            "#103": {"group_chat_id": -5233036184},
+            "#112": {"group_chat_id": -5162450800},
             "#132": {"group_chat_id": -5155828206},
-            "#143": {"group_chat_id": -5217200978}
+            "#143": {"group_chat_id": -5217200978},
+            "Lex1": {"group_chat_id": -5167889257},
+            "Lex2": {"group_chat_id": -5257148446},
+            "Lex6": {"group_chat_id": -5112242325},
+            "Lex7": {"group_chat_id": -5279607641},
+            "Lex10": {"group_chat_id": -5204094110},
+            "Lex11/#63": {"group_chat_id": -5083040356},
+            "Lex19": {"group_chat_id": -5254977860},
+            "Lex28": {"group_chat_id": -5269767297},
+            "Lex33": {"group_chat_id": -5121071814},
+            "Lex35": {"group_chat_id": -5290079522},
+            "Lex48": {"group_chat_id": -5259988260},
+            "Lex51": {"group_chat_id": -5102623265},
+            "Lex52": {"group_chat_id": -5189361497},
+            "Lex54": {"group_chat_id": -5120960431},
+            "Lex58": {"group_chat_id": -5064673874},
+            "Lex69": {"group_chat_id": -5170442208},
+            "Lex72": {"group_chat_id": -5252922911},
+            "Lex80": {"group_chat_id": -5039336421}
         }
     },
     6776561610: {  # Misha M (2)
