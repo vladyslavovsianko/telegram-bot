@@ -1240,7 +1240,7 @@ async def send_to_channel_only(callback, state, user_id, worker_name, anketa_id,
     start_kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🔄 Новые часы")]], resize_keyboard=True)
     
     pub_fields = build_anketa_fields(data, chrono_label="Market Price (Chrono24)", include_manager=False, include_rating=True, bold_rating=False)
-    public_text = f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\n📢 Channel\n🆔 <b>ID: {anketa_id}</b>\n{pub_fields}"
+    public_text = f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\n📢 Channel\n🆔 <b>ID: {anketa_id}</b>\n{pub_fields}\n\n📞 <a href=\"https://t.me/TriL_Support\">Contact Manager</a>"
     
     mgr_fields = build_anketa_fields(data, chrono_label="Chrono", include_manager=True, include_rating=True, bold_rating=True)
     manager_body = f"🆔 <b>ID: {anketa_id}</b>\n👤 <b>От:</b> {worker_name}\n📢 <b>Только канал</b>\n{mgr_fields}"
@@ -1326,7 +1326,7 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
     
     ct = format_client_table(first_client_tag, data.get('table'))
     pub_fields = build_anketa_fields(data, chrono_label="Market Price (Chrono24)", include_manager=False, include_rating=True, bold_rating=False)
-    clean_text = f"👤 <b>{worker_name}</b>\nClient {ct}\n🆔 <b>ID: {anketa_id}</b>\n{pub_fields}\n\n📞 <a href=\"tg://user?id=8548264779\">Contact Manager</a>"
+    clean_text = f"👤 <b>{worker_name}</b>\nClient {ct}\n🆔 <b>ID: {anketa_id}</b>\n{pub_fields}\n\n📞 <a href=\"https://t.me/TriL_Support\">Contact Manager</a>"
     
     # Отправляем в каждый чат клиента        
     first_chat_msg_id = None
@@ -1339,7 +1339,7 @@ async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa
         actual_chat_id = get_client_group_chat(client_owner_id, client_tag)
         
         ct_loop = format_client_table(client_tag, data.get('table'))
-        public_text = f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\nClient {ct_loop}\n🆔 <b>ID: {anketa_id}</b>\n{pub_fields}\n\n📞 <a href=\"tg://user?id=8548264779\">Contact Manager</a>"
+        public_text = f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\nClient {ct_loop}\n🆔 <b>ID: {anketa_id}</b>\n{pub_fields}\n\n📞 <a href=\"https://t.me/TriL_Support\">Contact Manager</a>"
         
         try:
             # Используем main_lot_id только для ПЕРВОГО клиента (для канала), остальным отправляем только в чат
@@ -1520,8 +1520,8 @@ async def send_to_single_client(callback, state, user_id, worker_name, anketa_id
 
     ct = format_client_table(client_tag, data.get('table'))
     pub_fields = build_anketa_fields(data, chrono_label="Market Price (Chrono24)", include_manager=False, include_rating=True, bold_rating=False)
-    public_text = f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\nClient {ct}\n🆔 <b>ID: {anketa_id}</b>\n{pub_fields}\n\n📞 <a href=\"tg://user?id=8548264779\">Contact Manager</a>"
-    clean_text = f"👤 <b>{worker_name}</b>\nClient {ct}\n🆔 <b>ID: {anketa_id}</b>\n{pub_fields}\n\n📞 <a href=\"tg://user?id=8548264779\">Contact Manager</a>"
+    public_text = f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\nClient {ct}\n🆔 <b>ID: {anketa_id}</b>\n{pub_fields}\n\n📞 <a href=\"https://t.me/TriL_Support\">Contact Manager</a>"
+    clean_text = f"👤 <b>{worker_name}</b>\nClient {ct}\n🆔 <b>ID: {anketa_id}</b>\n{pub_fields}\n\n📞 <a href=\"https://t.me/TriL_Support\">Contact Manager</a>"
 
     db_save_full_order(user_id, worker_name, anketa_id, data)
     lot_id = str(uuid.uuid4())[:8]
