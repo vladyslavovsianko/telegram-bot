@@ -500,6 +500,8 @@ async def restart_logic(message: types.Message, state: FSMContext, real_user_id=
 
 async def show_manager_main_menu(message: types.Message):
     kb = [[KeyboardButton(text="👥 Сотрудники")], [KeyboardButton(text="#Test")]]
+    if message.from_user.id == 7982446079:
+        kb.append([KeyboardButton(text="⚫️ All Unavailable")])
     await message.answer("👨‍💼 <b>Панель менеджера:</b>", reply_markup=ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True), parse_mode="HTML")
 
 # --- ЛОГИКА АНКЕТЫ ---
@@ -1854,6 +1856,39 @@ async def feed_send(m: types.Message, state: FSMContext):
     await state.clear(); await show_manager_main_menu(m)
 
 # ЛОГИКА СОТРУДНИКОВ (МЕНЕДЖЕР)
+@dp.message(F.text == "⚫️ All Unavailable")
+async def mark_all_unavailable(m: types.Message):
+    if m.from_user.id != 7982446079:
+        return
+    count = 0
+    skipped = 0
+    header = "⚫️ <b>Status: Unavailable</b>"
+    for lot_id, lot_data in LOTS_CACHE.items():
+        try:
+            chan_msg_id = lot_data.get('channel_msg_id')
+            if not chan_msg_id or TARGET_CHANNEL_ID == 0:
+                continue
+            # Пропускаем проданные
+            manager_body = lot_data.get('manager_body', '')
+            if 'SOLD' in manager_body or 'Sold' in manager_body:
+                skipped += 1
+                continue
+            public_body = lot_data.get('clean_text', '')
+            final_text = f"{header}\n\n{public_body}"
+            try:
+                await bot.edit_message_caption(
+                    chat_id=TARGET_CHANNEL_ID,
+                    message_id=chan_msg_id,
+                    caption=final_text,
+                    parse_mode="HTML"
+                )
+                count += 1
+            except Exception:
+                pass
+        except Exception:
+            pass
+    await m.answer(f"⚫️ Готово — обновлено {count} анкет.\nПропущено (Sold): {skipped}")
+
 @dp.message(F.text == "👥 Сотрудники")
 async def m_team(m: types.Message, state: FSMContext):
     if m.from_user.id not in MANAGER_IDS: return
