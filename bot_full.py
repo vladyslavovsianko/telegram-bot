@@ -83,7 +83,8 @@ user_client = TelegramClient('manager_session', API_ID, API_HASH)
 # ==========================================
 
 def init_db():
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, timeout=10)
+    conn.execute("PRAGMA journal_mode=WAL")
     cursor = conn.cursor()
     cursor.execute('''CREATE TABLE IF NOT EXISTS workers (
             user_id INTEGER PRIMARY KEY, name TEXT, counter INTEGER DEFAULT 0)''')
@@ -202,15 +203,21 @@ class EmployeeState(StatesGroup):
 
 def get_user_clients(user_id):
     """Возвращает словарь клиентов сотрудника из БД."""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT client_tag, group_chat_id FROM clients WHERE employee_id = ? AND is_active = 1",
-        (user_id,)
-    )
-    rows = cursor.fetchall()
-    conn.close()
-    return {tag: {"group_chat_id": gid} for tag, gid in rows}
+    for attempt in range(3):
+        try:
+            conn = sqlite3.connect(DB_FILE, timeout=10)
+            conn.execute("PRAGMA journal_mode=WAL")
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT client_tag, group_chat_id FROM clients WHERE employee_id = ? AND is_active = 1",
+                (user_id,)
+            )
+            rows = cursor.fetchall()
+            conn.close()
+            return {tag: {"group_chat_id": gid} for tag, gid in rows}
+        except Exception as e:
+            logging.warning(f"get_user_clients attempt {attempt+1} failed: {e}")
+    return {}
 
 def get_client_id(user_id, client_tag):
     """Получить ID клиента по тегу"""
