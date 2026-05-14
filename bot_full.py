@@ -46,179 +46,8 @@ CHANNEL_POST_DELAY = int(os.getenv("CHANNEL_POST_DELAY", "120"))
 API_ID = int(os.getenv("API_ID", "0"))
 API_HASH = os.getenv("API_HASH", "")
 
-# ⚠️ НАСТРОЙКИ КЛИЕНТОВ
-EMPLOYEES_CONFIG = {
-    12313213131321: { 
-        "clients": {
-            "#Test": {"group_chat_id": -5069461222},
-            "#1": {"group_chat_id": -5069461222},
-            "#2": {"group_chat_id": -5069461222},
-            "#3": {"group_chat_id": -5069461222},
-            "#4": {"group_chat_id": -5069461222},
-            "#5": {"group_chat_id": -5069461222},
-            "#6": {"group_chat_id": -5069461222},
-            "#7": {"group_chat_id": -5069461222},
-            "#8": {"group_chat_id": -5069461222},
-            "#9": {"group_chat_id": -5069461222},
-            "#10": {"group_chat_id": -5069461222},
-            "#11": {"group_chat_id": -5069461222},
-            "#12": {"group_chat_id": -5069461222},
-            "#13": {"group_chat_id": -5069461222},
-            "#14": {"group_chat_id": -5069461222},
-            "#15": {"group_chat_id": -5069461222},
-            "#16": {"group_chat_id": -5069461222},
-            "#17": {"group_chat_id": -5069461222},
-            "#18": {"group_chat_id": -5069461222},
-            "#19": {"group_chat_id": -5069461222},
-            "#20": {"group_chat_id": -5069461222}
-        } 
-    },
-    610220736: { 
-        "clients": { 
-            "#1": {"group_chat_id": -5182586637},
-            "#2": {"group_chat_id": -5105834721},
-            "#3": {"group_chat_id": -5029226279},
-            "#4": {"group_chat_id": -5069461222},
-            "#5": {"group_chat_id": -5069461222},
-            "#6": {"group_chat_id": -5069461222},
-            "#7": {"group_chat_id": -5069461222},
-            "#8": {"group_chat_id": -5069461222},
-            "#9": {"group_chat_id": -5069461222},
-            "#10": {"group_chat_id": -5069461222},
-            "#11": {"group_chat_id": -5069461222},
-            "#12": {"group_chat_id": -5069461222},
-            "#13": {"group_chat_id": -5069461222},
-            "#14": {"group_chat_id": -5069461222},
-            "#15": {"group_chat_id": -5069461222},
-            "#16": {"group_chat_id": -5069461222},
-            "#17": {"group_chat_id": -5069461222},
-            "#18": {"group_chat_id": -5069461222},
-            "#19": {"group_chat_id": -5069461222},
-            "#20": {"group_chat_id": -5069461222},
-            "#136": {"group_chat_id": -5295466035}
-        } 
-    },
-    645070075: {  # Vladyslav
-        "clients": {
-            "#96": {"group_chat_id": -5238109092},
-            "#137": {"group_chat_id": -5265690494},
-            "#140": {"group_chat_id": -5102101973},
-            "#145": {"group_chat_id": -5101810449},
-            "#148": {"group_chat_id": -5247473724},
-            "Toy17": {"group_chat_id": -4995762095},
-            "Toy21": {"group_chat_id": -5291979002},
-            "Toy23": {"group_chat_id": -5142004346},
-            "Toy40": {"group_chat_id": -5229699686},
-            "Toy44": {"group_chat_id": -5086915437},
-            "Toy46": {"group_chat_id": -5173644458},
-            "Toy67": {"group_chat_id": -5234402500},
-            "#151": {"group_chat_id": -5179525022},
-            "Toy74": {"group_chat_id": -5287917185}
-        }
-    },
-    625971673: {  # Виталий
-        "clients": {
-            "#79": {"group_chat_id": -5148667064},
-            "#85": {"group_chat_id": -5016013600},
-            "#87": {"group_chat_id": -5171048824},
-            "#93": {"group_chat_id": -5006054596},
-            "#97": {"group_chat_id": -5148348191},
-            "#99": {"group_chat_id": -5033105513},
-            "#107": {"group_chat_id": -5180230828},
-            "#111": {"group_chat_id": -5176219649},
-            "#113": {"group_chat_id": -5212526001},
-            "#124": {"group_chat_id": -5121925059},
-            "#131": {"group_chat_id": -5291287861},
-            "#139": {"group_chat_id": -5143478306},
-            "#146": {"group_chat_id": -5242427630},
-            "Toy26": {"group_chat_id": -5256884020},
-            "Toy27": {"group_chat_id": -5251521211},
-            "Toy31": {"group_chat_id": -5239027986},
-            "Toy34": {"group_chat_id": -5278523032},
-            "Toy38": {"group_chat_id": -5200145003},
-            "Toy49": {"group_chat_id": -5267417206},
-            "Toy55": {"group_chat_id": -5117908085},
-            "Toy59": {"group_chat_id": -5298602440},
-            "Toy60": {"group_chat_id": -5298774186},
-            "Toy73": {"group_chat_id": -5021649061}
-        }
-    },
-    5442618444: {  # Миша K
-        "clients": {
-            "#94": {"group_chat_id": -5217474814},
-            "#98": {"group_chat_id": -4968185056},
-            "#101": {"group_chat_id": -5291170403},
-            "#103": {"group_chat_id": -5233036184},
-            "#110": {"group_chat_id": -5157805999},
-            "#117": {"group_chat_id": -5105853553},
-            "#118": {"group_chat_id": -5188694886},
-            "#122": {"group_chat_id": -5256550803},
-            "#125": {"group_chat_id": -5156346053},
-            "#127": {"group_chat_id": -5113224392},
-            "#142": {"group_chat_id": -5193651565},
-            "#144": {"group_chat_id": -5294989828},
-            "#147": {"group_chat_id": -5157970276},
-            "Toy8": {"group_chat_id": -5143325351},
-            "Toy32": {"group_chat_id": -5207210520},
-            "Toy41": {"group_chat_id": -5163315891},
-            "Toy49": {"group_chat_id": -5267417206},
-            "Toy56": {"group_chat_id": -5164434247},
-            "Toy75": {"group_chat_id": -5267574631},
-            "Toy76": {"group_chat_id": -5115911386},
-        }
-    },
-    419890021: {  # Олег
-        "clients": {
-            "#58": {"group_chat_id": -5227727762},
-            "#103": {"group_chat_id": -5233036184},
-            "#112": {"group_chat_id": -5162450800},
-            "#132": {"group_chat_id": -5155828206},
-            "#143": {"group_chat_id": -5217200978},
-            "Lex1": {"group_chat_id": -5167889257},
-            "Lex2": {"group_chat_id": -5257148446},
-            "Lex6": {"group_chat_id": -5112242325},
-            "Lex7": {"group_chat_id": -5279607641},
-            "Lex10": {"group_chat_id": -5204094110},
-            "Lex11/#63": {"group_chat_id": -5083040356},
-            "Lex19": {"group_chat_id": -5254977860},
-            "Lex28": {"group_chat_id": -5269767297},
-            "Lex33": {"group_chat_id": -5121071814},
-            "Lex35": {"group_chat_id": -5290079522},
-            "Lex48": {"group_chat_id": -5259988260},
-            "Lex51": {"group_chat_id": -5102623265},
-            "Lex52": {"group_chat_id": -5189361497},
-            "Lex54": {"group_chat_id": -5120960431},
-            "Lex58": {"group_chat_id": -5064673874},
-            "Lex69": {"group_chat_id": -5170442208},
-            "Lex72": {"group_chat_id": -5252922911},
-            "Lex80": {"group_chat_id": -5039336421}
-        }
-    },
-    6776561610: {  # Misha M (2)
-        "clients": {
-            "#102": {"group_chat_id": -5141670241},
-            "#105": {"group_chat_id": -5280848104},
-            "#106": {"group_chat_id": -5086400568},
-            "#121": {"group_chat_id": -5221766017},
-            "#126": {"group_chat_id": -4758469868},
-            "#128": {"group_chat_id": -5250840602},
-            "#133": {"group_chat_id": -5125987879},
-            "#134": {"group_chat_id": -5157432882},
-            "#138": {"group_chat_id": -5264463337},
-            "#141": {"group_chat_id": -5199206222},
-            "#149": {"group_chat_id": -5290810666},
-            "Toy42": {"group_chat_id": -5299629678},
-            "Toy49": {"group_chat_id": -5267417206},
-            "Toy50": {"group_chat_id": -5187555997},
-            "Toy61": {"group_chat_id": -5139479896},
-            "Toy63": {"group_chat_id": -5205007325},
-            "Toy64": {"group_chat_id": -5174345325},
-            "Toy68": {"group_chat_id": -5245264756},
-            "Toy78": {"group_chat_id": -5101378007},
-            "Toy79": {"group_chat_id": -5143216107}
-        }
-    }
-}
+# EMPLOYEES_CONFIG перенесён в базу данных (таблицы workers + clients).
+# Управление через веб-панель: http://SERVER_IP:5001/admin
 
 DB_FILE = 'bot_database.db'
 LOTS_CACHE_FILE = 'lots_cache.json'
@@ -287,22 +116,14 @@ def db_check_worker(user_id):
 def db_get_next_id(user_id):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute("SELECT name, counter FROM workers WHERE user_id = ?", (user_id,))
+    cursor.execute("SELECT name, counter, prefix FROM workers WHERE user_id = ?", (user_id,))
     data = cursor.fetchone()
-    if not data: conn.close(); return "UNK0" 
-    name, current_counter = data
-    
-    # Уникальные префиксы для каждого работника
-    PREFIX_MAP = {
-        610220736: "MM",      # Misha M
-        6776561610: "MM",     # Misha M (2)
-        5442618444: "MK",     # Misha K
-        645070075: "VL",      # Vladyslav
-        625971673: "VIT",     # Vitalij
-        419890021: "O",       # Oleh
-    }
-    
-    prefix = PREFIX_MAP.get(user_id, name[0].upper() if name else "X")
+    if not data:
+        conn.close()
+        return "UNK0"
+    name, current_counter, prefix = data
+    if not prefix:
+        prefix = name[0].upper() if name else "X"
     new_counter = current_counter + 1
     cursor.execute("UPDATE workers SET counter = ? WHERE user_id = ?", (new_counter, user_id))
     conn.commit()
@@ -381,10 +202,16 @@ class EmployeeState(StatesGroup):
 # ==========================================
 
 def get_user_clients(user_id):
-    """Возвращает словарь клиентов сотрудника"""
-    config = EMPLOYEES_CONFIG.get(user_id)
-    if config: return config['clients']
-    return {}
+    """Возвращает словарь клиентов сотрудника из БД."""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT client_tag, group_chat_id FROM clients WHERE employee_id = ? AND is_active = 1",
+        (user_id,)
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return {tag: {"group_chat_id": gid} for tag, gid in rows}
 
 def get_client_id(user_id, client_tag):
     """Получить ID клиента по тегу"""
@@ -629,13 +456,23 @@ async def show_other_workers_menu(message: types.Message, state: FSMContext):
     """Показывает список других работников"""
     current_user_id = message.from_user.id
     
-    # Получаем список всех работников кроме текущего
+    # Получаем список всех работников кроме текущего из БД
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute(
+        """SELECT DISTINCT w.user_id FROM workers w
+           INNER JOIN clients c ON w.user_id = c.employee_id
+           WHERE w.user_id != ? AND c.is_active = 1""",
+        (current_user_id,)
+    )
+    other_ids = [row[0] for row in cursor.fetchall()]
+    conn.close()
+
     workers_list = []
-    for worker_id, config in EMPLOYEES_CONFIG.items():
-        if worker_id != current_user_id and config.get('clients'):
-            worker_name = db_check_worker(worker_id)
-            if worker_name:
-                workers_list.append(f"👤 {worker_name}")
+    for worker_id in other_ids:
+        worker_name = db_check_worker(worker_id)
+        if worker_name:
+            workers_list.append(f"👤 {worker_name}")
     
     if not workers_list:
         await message.answer("⚠️ Нет других работников")
