@@ -387,7 +387,6 @@ admin = Admin(
     app,
     name='🤖 Bot Admin',
     index_view=SecureIndex(),
-    template_mode='bootstrap4',
 )
 
 admin.add_view(WorkerView(Worker,   db.session, name='👤 Сотрудники', category='Данные'))
