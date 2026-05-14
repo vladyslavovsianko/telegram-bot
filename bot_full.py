@@ -1725,7 +1725,7 @@ async def feed_send(m: types.Message, state: FSMContext):
 # ЛОГИКА СОТРУДНИКОВ (МЕНЕДЖЕР)
 @dp.message(F.text == "⚫️ All Unavailable")
 async def mark_all_unavailable(m: types.Message):
-    if m.from_user.id != 7982446079:
+    if m.from_user.id not in MANAGER_IDS and m.from_user.id not in STATUS_MODERATORS:
         return
     count = 0
     skipped = 0
