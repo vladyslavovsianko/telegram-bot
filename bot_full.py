@@ -105,13 +105,14 @@ def init_db():
     conn.close()
 
 def db_check_worker(user_id):
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, timeout=10)
     cursor = conn.cursor()
     cursor.execute("SELECT name FROM workers WHERE user_id = ?", (user_id,))
     result = cursor.fetchone()
     conn.close()
-    if result: return result[0]
-    return None
+    name = result[0] if result else None
+    logging.info(f"db_check_worker({user_id}) → {name}")
+    return name
 
 def db_get_next_id(user_id):
     conn = sqlite3.connect(DB_FILE)
@@ -214,9 +215,11 @@ def get_user_clients(user_id):
             )
             rows = cursor.fetchall()
             conn.close()
+            logging.info(f"get_user_clients({user_id}) → {len(rows)} clients")
             return {tag: {"group_chat_id": gid} for tag, gid in rows}
         except Exception as e:
             logging.warning(f"get_user_clients attempt {attempt+1} failed: {e}")
+    logging.error(f"get_user_clients({user_id}) → all attempts failed, returning empty")
     return {}
 
 def get_client_id(user_id, client_tag):
