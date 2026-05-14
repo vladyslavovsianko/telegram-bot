@@ -357,7 +357,7 @@ async def restart_logic(message: types.Message, state: FSMContext, real_user_id=
 
 async def show_manager_main_menu(message: types.Message):
     kb = [[KeyboardButton(text="👥 Сотрудники")], [KeyboardButton(text="#Test")]]
-    if message.from_user.id == 7982446079:
+    if message.from_user.id in MANAGER_IDS or message.from_user.id in STATUS_MODERATORS:
         kb.append([KeyboardButton(text="⚫️ All Unavailable")])
     await message.answer("👨‍💼 <b>Панель менеджера:</b>", reply_markup=ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True), parse_mode="HTML")
 
@@ -378,6 +378,8 @@ async def show_client_menu(message: types.Message, user_id=None):
         if len(row) == 3: kb_rows.append(row); row = []
     if row: kb_rows.append(row)
     kb_rows.append([KeyboardButton(text="📢 Канал"), KeyboardButton(text="📋 Несколько клиентов")])
+    if user_id in STATUS_MODERATORS:
+        kb_rows.append([KeyboardButton(text="⚫️ All Unavailable")])
     kb = ReplyKeyboardMarkup(keyboard=kb_rows, resize_keyboard=True, is_persistent=True)
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id)
     await fsm.set_state(Form.choosing_client)
