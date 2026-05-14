@@ -1783,6 +1783,9 @@ async def main():
     init_db() # АВТО-ЗАПУСК СОЗДАНИЯ ТАБЛИЦ
     load_lots_cache()  # Загрузка кэша лотов после перезапуска
     logging.info("Bot started (v104: Persistent LOTS_CACHE)")
+    logging.info(f"📢 TARGET_CHANNEL_ID={TARGET_CHANNEL_ID}")
+    logging.info(f"💬 TARGET_CHAT_ID={TARGET_CHAT_ID}")
+    logging.info(f"⭐ VIP_GROUP_ID={VIP_GROUP_ID}")
     await user_client.start(); await dp.start_polling(bot)
 
 if __name__ == "__main__": asyncio.run(main())
