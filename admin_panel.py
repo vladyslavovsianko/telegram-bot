@@ -15,7 +15,7 @@
 import os
 import sqlite3
 
-from flask import Flask, redirect, url_for, request, render_template_string
+from flask import Flask, redirect, url_for, request, render_template_string, current_app
 from flask_admin import Admin, AdminIndexView, BaseView, expose
 from flask_admin.contrib.sqla import ModelView
 from flask_sqlalchemy import SQLAlchemy
@@ -165,14 +165,38 @@ class AuthMixin:
 # ──────────────────────────────────────────────────────────────────────────────
 
 INDEX_TMPL = '''
-{% extends 'admin/master.html' %}
-{% block body %}
-<div class="container-fluid py-4">
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Bot Admin</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <style>
+    body { background: #f8f9fa; }
+    .navbar { background: #212529; }
+    .nav-link { color: #adb5bd !important; }
+    .nav-link:hover { color: #fff !important; }
+  </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg mb-4">
+  <div class="container-fluid">
+    <a class="navbar-brand text-white" href="/admin/">🤖 Bot Admin</a>
+    <div class="navbar-nav ms-auto">
+      <a class="nav-link" href="/admin/worker/">👤 Сотрудники</a>
+      <a class="nav-link" href="/admin/client/">👥 Клиенты</a>
+      <a class="nav-link" href="/admin/order/">📋 Заказы</a>
+      <a class="nav-link" href="/admin/setting/">⚙️ Настройки</a>
+      <a class="nav-link text-danger" href="/logout">Выйти</a>
+    </div>
+  </div>
+</nav>
+<div class="container-fluid px-4">
   <h4 class="mb-4">📊 Обзор</h4>
   <div class="row g-3 mb-5">
     <div class="col-sm-4">
       <div class="card text-white bg-primary">
-        <div class="card-body text-center">
+        <div class="card-body text-center py-3">
           <h2 class="mb-0">{{ workers_count }}</h2>
           <small>Сотрудников</small>
         </div>
@@ -180,7 +204,7 @@ INDEX_TMPL = '''
     </div>
     <div class="col-sm-4">
       <div class="card text-white bg-success">
-        <div class="card-body text-center">
+        <div class="card-body text-center py-3">
           <h2 class="mb-0">{{ clients_count }}</h2>
           <small>Активных клиентов</small>
         </div>
@@ -188,42 +212,44 @@ INDEX_TMPL = '''
     </div>
     <div class="col-sm-4">
       <div class="card text-white bg-info">
-        <div class="card-body text-center">
+        <div class="card-body text-center py-3">
           <h2 class="mb-0">{{ orders_count }}</h2>
           <small>Анкет всего</small>
         </div>
       </div>
     </div>
   </div>
-
   <h5 class="mb-3">📬 Анкеты по сотрудникам</h5>
-  <div class="table-responsive">
-    <table class="table table-bordered table-hover table-sm">
-      <thead class="table-dark">
-        <tr>
-          <th>Сотрудник</th>
-          <th class="text-center">Всего</th>
-          <th class="text-center">Available</th>
-          <th class="text-center">Sold</th>
-          <th class="text-center">Другие</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in stats %}
-        <tr>
-          <td><b>{{ row.name }}</b></td>
-          <td class="text-center"><span class="badge bg-secondary">{{ row.total }}</span></td>
-          <td class="text-center"><span class="badge bg-success">{{ row.available }}</span></td>
-          <td class="text-center"><span class="badge bg-danger">{{ row.sold }}</span></td>
-          <td class="text-center"><span class="badge bg-light text-dark">{{ row.other }}</span></td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-bordered table-hover table-sm mb-0">
+        <thead class="table-dark">
+          <tr>
+            <th>Сотрудник</th>
+            <th class="text-center">Всего</th>
+            <th class="text-center">Available</th>
+            <th class="text-center">Sold</th>
+            <th class="text-center">Другие</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in stats %}
+          <tr>
+            <td><b>{{ row.name }}</b></td>
+            <td class="text-center"><span class="badge bg-secondary">{{ row.total }}</span></td>
+            <td class="text-center"><span class="badge bg-success">{{ row.available }}</span></td>
+            <td class="text-center"><span class="badge bg-danger">{{ row.sold }}</span></td>
+            <td class="text-center"><span class="badge bg-light text-dark">{{ row.other }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
-  <p class="text-muted small mt-2">Данные в реальном времени. Для детального просмотра — раздел <a href="/admin/order/">📋 Заказы</a></p>
+  <p class="text-muted small mt-3">Данные в реальном времени. Для детального просмотра — <a href="/admin/order/">📋 Заказы</a></p>
 </div>
-{% endblock %}
+</body>
+</html>
 '''
 
 
@@ -266,7 +292,7 @@ class SecureIndex(AuthMixin, AdminIndexView):
             workers_count = clients_count = orders_count = '?'
             stats = []
 
-        return self.render(
+        return render_template_string(
             INDEX_TMPL,
             workers_count=workers_count,
             clients_count=clients_count,
