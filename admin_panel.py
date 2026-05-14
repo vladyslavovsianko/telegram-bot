@@ -15,7 +15,7 @@
 import os
 import sqlite3
 
-from flask import Flask, redirect, url_for, request, render_template_string, Markup
+from flask import Flask, redirect, url_for, request, render_template_string
 from flask_admin import Admin, AdminIndexView, BaseView, expose
 from flask_admin.contrib.sqla import ModelView
 from flask_sqlalchemy import SQLAlchemy
