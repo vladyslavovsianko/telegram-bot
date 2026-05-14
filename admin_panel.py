@@ -327,7 +327,7 @@ class WorkerView(AuthMixin, ModelView):
 
 class ClientView(AuthMixin, ModelView):
     column_list            = ['worker', 'client_tag', 'group_chat_id', 'is_active']
-    form_columns           = ['employee_id', 'client_tag', 'group_chat_id', 'is_active']
+    form_columns           = ['worker', 'client_tag', 'group_chat_id', 'is_active']
     column_labels          = {
         'worker':        'Сотрудник',
         'client_tag':    'Тег клиента',
@@ -336,7 +336,7 @@ class ClientView(AuthMixin, ModelView):
         'employee_id':   'ID сотрудника',
     }
     column_searchable_list = ['client_tag']
-    column_filters         = ['is_active', 'employee_id']
+    column_filters         = ['is_active']
     can_export             = True
     export_types           = ['csv']
     page_size              = 50
