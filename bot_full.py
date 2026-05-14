@@ -16,40 +16,39 @@ from aiogram.exceptions import TelegramBadRequest
 from telethon import TelegramClient
 from dotenv import load_dotenv
 
-# Загружаем переменные из .env файла
+# .env используется только как резервный источник если БД недоступна
 load_dotenv()
 
+DB_FILE = 'bot_database.db'
+
 # ==========================================
-# 1. НАСТРОЙКИ
+# 1. НАСТРОЙКИ — читаются из таблицы settings в БД
 # ==========================================
 
-TOKEN = os.getenv("BOT_TOKEN")
+def _get_setting(key: str, default: str = "") -> str:
+    """Читает параметр из таблицы settings. Fallback — переменная окружения."""
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        row = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+        conn.close()
+        if row and row[0] is not None and row[0] != "":
+            return row[0]
+    except Exception:
+        pass
+    return os.getenv(key, default)
 
-# 👑 ГЛАВНЫЕ МЕНЕДЖЕРЫ
-MANAGER_IDS = [int(x) for x in os.getenv("MANAGER_IDS", "").split(",") if x]
-
-# 👮‍♂️ МОДЕРАТОРЫ
-STATUS_MODERATORS = [int(x) for x in os.getenv("STATUS_MODERATORS", "").split(",") if x]
-
-# КАНАЛЫ (Витрина)
-TARGET_CHANNEL_ID = int(os.getenv("TARGET_CHANNEL_ID", "-1003745353210"))
-
-# ГРУППА ДЛЯ АВТО-ПОСТИНГА VIP
-VIP_GROUP_ID = int(os.getenv("VIP_GROUP_ID", "0"))
-
-# ЧАТ ПО УМОЛЧАНИЮ
-TARGET_CHAT_ID = int(os.getenv("TARGET_CHAT_ID", "0"))
-
-# ⏱ ЗАДЕРЖКА ПУБЛИКАЦИИ В КАНАЛ (СЕКУНДЫ)
-CHANNEL_POST_DELAY = int(os.getenv("CHANNEL_POST_DELAY", "120"))
-
-API_ID = int(os.getenv("API_ID", "0"))
-API_HASH = os.getenv("API_HASH", "")
+TOKEN               = _get_setting("BOT_TOKEN")
+API_ID              = int(_get_setting("API_ID", "0"))
+API_HASH            = _get_setting("API_HASH", "")
+TARGET_CHANNEL_ID   = int(_get_setting("TARGET_CHANNEL_ID", "0"))
+VIP_GROUP_ID        = int(_get_setting("VIP_GROUP_ID", "0"))
+TARGET_CHAT_ID      = int(_get_setting("TARGET_CHAT_ID", "0"))
+CHANNEL_POST_DELAY  = int(_get_setting("CHANNEL_POST_DELAY", "120"))
+MANAGER_IDS         = [int(x) for x in _get_setting("MANAGER_IDS", "").split(",") if x.strip()]
+STATUS_MODERATORS   = [int(x) for x in _get_setting("STATUS_MODERATORS", "").split(",") if x.strip()]
 
 # EMPLOYEES_CONFIG перенесён в базу данных (таблицы workers + clients).
 # Управление через веб-панель: http://SERVER_IP:5001/admin
-
-DB_FILE = 'bot_database.db'
 LOTS_CACHE_FILE = 'lots_cache.json'
 LOTS_CACHE = {}
 INVITE_LINK_CACHE = {}  # chat_id -> invite_link (кэш инвайт-ссылок)

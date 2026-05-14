@@ -247,6 +247,13 @@ INDEX_TMPL = '''
     </div>
   </div>
   <p class="text-muted small mt-3">Данные в реальном времени. Для детального просмотра — <a href="/admin/order/">📋 Заказы</a></p>
+
+  <hr class="my-4">
+  <h5 class="mb-3">🔧 Управление ботом</h5>
+  <p class="text-muted small">После изменения настроек нужно перезапустить бота чтобы изменения применились.</p>
+  <form method="post" action="/restart-bot" onsubmit="return confirm('Перезапустить бота?')">
+    <button type="submit" class="btn btn-warning">🔄 Перезапустить бота</button>
+  </form>
 </div>
 </body>
 </html>
@@ -403,6 +410,24 @@ def logout():
 @app.route('/')
 def root():
     return redirect(url_for('admin.index'))
+
+
+@app.route('/restart-bot', methods=['POST'])
+def restart_bot():
+    """Перезапускает бота после изменения настроек."""
+    if not is_authenticated():
+        return redirect(url_for('login'))
+    import subprocess
+    subprocess.Popen(
+        'pkill -f bot_full.py; sleep 1; nohup python3 /opt/telegram-bot/bot_full.py > /opt/telegram-bot/bot.log 2>&1 &',
+        shell=True
+    )
+    return '''
+    <meta http-equiv="refresh" content="3;url=/admin/">
+    <p style="font-family:sans-serif;padding:40px">
+      ✅ Бот перезапускается... Перенаправление через 3 секунды.
+    </p>
+    '''
 
 
 # ──────────────────────────────────────────────────────────────────────────────
