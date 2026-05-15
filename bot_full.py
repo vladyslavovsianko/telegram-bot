@@ -396,7 +396,7 @@ async def show_client_menu(message: types.Message, user_id=None):
     kb_rows.append([KeyboardButton(text="📢 Канал"), KeyboardButton(text="📋 Несколько клиентов")])
     if user_id not in NO_OTHERS_BTN and user_id not in MANAGER_IDS:
         kb_rows.append([KeyboardButton(text="👥 Другие")])
-    kb = ReplyKeyboardMarkup(keyboard=kb_rows, resize_keyboard=True, is_persistent=True)
+    kb = ReplyKeyboardMarkup(keyboard=kb_rows, resize_keyboard=True)
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id)
     await fsm.set_state(Form.choosing_client)
     await message.answer("1️⃣ <b>Выбери клиента:</b>", reply_markup=kb, parse_mode="HTML")
