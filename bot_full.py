@@ -49,8 +49,8 @@ STATUS_MODERATORS   = [int(x) for x in _get_setting("STATUS_MODERATORS", "").spl
 
 # Кто НЕ получает кнопку "Другие" (Олег, Миша М оба аккаунта)
 NO_OTHERS_BTN = {419890021, 610220736, 6776561610}
-# Кто НЕ показывается в списке "Другие" (Олег, тестовый работник, второй аккаунт Миши М)
-NO_OTHERS_LIST = {419890021, 12313213131321, 6776561610}
+# Кто НЕ показывается в списке "Другие" (Олег, тестовый работник, первый аккаунт Миши М — показываем второй)
+NO_OTHERS_LIST = {419890021, 12313213131321, 610220736}
 
 # EMPLOYEES_CONFIG перенесён в базу данных (таблицы workers + clients).
 # Управление через веб-панель: http://SERVER_IP:5001/admin
@@ -367,10 +367,19 @@ async def show_manager_main_menu(message: types.Message):
     await message.answer("👨‍💼 <b>Панель менеджера:</b>", reply_markup=ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True), parse_mode="HTML")
 
 # --- ЛОГИКА АНКЕТЫ ---
+def _sort_key(tag: str):
+    """Сортировка клиентов: #127 → 127, Toy77 → (Toy, 77), Lex28 → (Lex, 28)"""
+    import re as _re
+    m = _re.match(r'^[#№](\d+)', tag)
+    if m: return (0, int(m.group(1)), tag)
+    m = _re.match(r'^([A-Za-z]+)\s*(\d+)', tag)
+    if m: return (1, m.group(1), int(m.group(2)), tag)
+    return (2, tag)
+
 async def show_client_menu(message: types.Message, user_id=None):
     if not user_id: user_id = message.from_user.id
     clients_dict = get_user_clients(user_id)
-    clients_list = list(clients_dict.keys())
+    clients_list = sorted(clients_dict.keys(), key=_sort_key)
     if not clients_list:
         if user_id in MANAGER_IDS: pass
         else: await message.answer("⚠️ Нет клиентов."); return
