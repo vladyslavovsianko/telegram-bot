@@ -51,6 +51,8 @@ STATUS_MODERATORS   = [int(x) for x in _get_setting("STATUS_MODERATORS", "").spl
 NO_OTHERS_BTN = {419890021, 610220736, 6776561610}
 # Кто НЕ показывается в списке "Другие" (Олег, тестовый работник, первый аккаунт Миши М — показываем второй)
 NO_OTHERS_LIST = {419890021, 12313213131321, 610220736}
+# Кто получает InlineKeyboard вместо ReplyKeyboard для выбора клиента (Android-совместимость)
+INLINE_KB_USERS = {625971673}
 
 # EMPLOYEES_CONFIG перенесён в базу данных (таблицы workers + clients).
 # Управление через веб-панель: http://SERVER_IP:5001/admin
@@ -386,24 +388,35 @@ async def show_client_menu(message: types.Message, user_id=None):
         if user_id in MANAGER_IDS: pass
         else: await message.answer("⚠️ Нет клиентов."); return
 
-    builder = InlineKeyboardBuilder()
-    for btn in clients_list:
-        builder.button(text=btn, callback_data=f"cli:{btn}")
-    builder.adjust(3)
-    builder.row(
-        InlineKeyboardButton(text="📢 Канал", callback_data="cli:__channel__"),
-        InlineKeyboardButton(text="📋 Несколько", callback_data="cli:__multi__")
-    )
-    if user_id not in NO_OTHERS_BTN and user_id not in MANAGER_IDS:
-        builder.row(InlineKeyboardButton(text="👥 Другие", callback_data="cli:__others__"))
-
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id)
     await fsm.set_state(Form.choosing_client)
-    await message.answer(
-        "1️⃣ <b>Выбери клиента:</b>",
-        reply_markup=builder.as_markup(),
-        parse_mode="HTML"
-    )
+
+    if user_id in INLINE_KB_USERS:
+        # InlineKeyboard для пользователей с проблемами на Android
+        builder = InlineKeyboardBuilder()
+        for btn in clients_list:
+            builder.button(text=btn, callback_data=f"cli:{btn}")
+        builder.adjust(3)
+        builder.row(
+            InlineKeyboardButton(text="📢 Канал", callback_data="cli:__channel__"),
+            InlineKeyboardButton(text="📋 Несколько", callback_data="cli:__multi__")
+        )
+        if user_id not in NO_OTHERS_BTN and user_id not in MANAGER_IDS:
+            builder.row(InlineKeyboardButton(text="👥 Другие", callback_data="cli:__others__"))
+        await message.answer("1️⃣ <b>Выбери клиента:</b>", reply_markup=builder.as_markup(), parse_mode="HTML")
+    else:
+        # ReplyKeyboard для всех остальных
+        kb_rows = []
+        row = []
+        for btn in clients_list:
+            row.append(KeyboardButton(text=btn))
+            if len(row) == 3: kb_rows.append(row); row = []
+        if row: kb_rows.append(row)
+        kb_rows.append([KeyboardButton(text="📢 Канал"), KeyboardButton(text="📋 Несколько клиентов")])
+        if user_id not in NO_OTHERS_BTN and user_id not in MANAGER_IDS:
+            kb_rows.append([KeyboardButton(text="👥 Другие")])
+        kb = ReplyKeyboardMarkup(keyboard=kb_rows, resize_keyboard=True, is_persistent=True)
+        await message.answer("1️⃣ <b>Выбери клиента:</b>", reply_markup=kb, parse_mode="HTML")
 
 
 @dp.callback_query(F.data.startswith("cli:"), StateFilter(Form.choosing_client))
@@ -441,10 +454,20 @@ async def callback_client_menu(callback: types.CallbackQuery, state: FSMContext)
 
 @dp.message(Form.choosing_client)
 async def process_client(message: types.Message, state: FSMContext):
-    logging.info(f"🔍 process_client (text) вызван: текст='{message.text}'")
+    logging.info(f"🔍 process_client вызван: текст='{message.text}'")
 
     if message.text == "🔄 Новые часы":
         return await restart_logic(message, state)
+
+    if message.text == "📋 Несколько клиентов":
+        return await start_multi_client_selection(message, state)
+
+    if message.text == "👥 Другие":
+        return await show_other_workers_menu(message, state)
+
+    if message.text == "📢 Канал":
+        await state.update_data(client="📢 Channel", channel_only=True)
+        return await check_edit_or_next(message, state, show_media_menu)
 
     data = await state.get_data()
 
@@ -471,6 +494,23 @@ async def process_client(message: types.Message, state: FSMContext):
                 selected.append(client)
             await state.update_data(selected_clients=selected)
             return await show_multi_client_menu(message, state)
+        return
+
+    # Обычный режим — один клиент (ReplyKeyboard, для не-INLINE пользователей)
+    uid = message.from_user.id
+    valid_clients = list(get_user_clients(uid).keys())
+    other_worker_id = data.get('other_worker_id')
+    if other_worker_id:
+        valid_clients += list(get_user_clients(other_worker_id).keys())
+
+    if message.text == "#Test" and uid in MANAGER_IDS:
+        await state.update_data(client="#Test")
+    elif message.text in valid_clients or uid in MANAGER_IDS:
+        await state.update_data(client=message.text)
+    else:
+        logging.warning(f"⚠️ Неверный клиент '{message.text}' от {uid}, возврат в меню")
+        return await show_client_menu(message, user_id=uid)
+    await check_edit_or_next(message, state, show_media_menu)
 
 async def start_multi_client_selection(message: types.Message, state: FSMContext):
     """Начинаем выбор нескольких клиентов"""
