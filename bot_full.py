@@ -383,7 +383,7 @@ async def show_client_menu(message: types.Message, user_id=None):
         if len(row) == 3: kb_rows.append(row); row = []
     if row: kb_rows.append(row)
     kb_rows.append([KeyboardButton(text="📢 Канал"), KeyboardButton(text="📋 Несколько клиентов")])
-    if user_id not in NO_OTHERS_BTN and user_id not in MANAGER_IDS and user_id not in STATUS_MODERATORS:
+    if user_id not in NO_OTHERS_BTN and user_id not in MANAGER_IDS:
         kb_rows.append([KeyboardButton(text="👥 Другие")])
     kb = ReplyKeyboardMarkup(keyboard=kb_rows, resize_keyboard=True, is_persistent=True)
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id)
