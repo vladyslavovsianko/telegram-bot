@@ -39,14 +39,29 @@ async def main():
     await client.start()
     print(f"\nSearch {len(SEARCH)} clients...\n")
     
-    found = {}
+    found = {}       # tag -> (id, name) — первое совпадение
+    duplicates = {}  # tag -> [(id, name), ...] — все совпадения
     async for dialog in client.iter_dialogs(limit=None):
         name = dialog.name or ""
         for s in SEARCH:
-            if s in name and s not in found:
-                found[s] = (dialog.id, name)
-                print(f"MATCH [{s}] -> {name} | ID: {dialog.id}")
-    
+            if s in name:
+                if s not in found:
+                    found[s] = (dialog.id, name)
+                    print(f"MATCH [{s}] -> {name} | ID: {dialog.id}")
+                else:
+                    # Нашли второй (третий...) чат с тем же именем
+                    if s not in duplicates:
+                        duplicates[s] = [found[s]]
+                    duplicates[s].append((dialog.id, name))
+                    print(f"DUPLICATE [{s}] -> {name} | ID: {dialog.id}")
+
+    if duplicates:
+        print("\n!!! DUPLICATES — check manually which ID is correct !!!")
+        for tag, matches in duplicates.items():
+            print(f"  [{tag}]:")
+            for mid, mname in matches:
+                print(f"    ID: {mid}  name: {mname}")
+
     not_found = [s for s in SEARCH if s not in found]
     print(f"\nFound: {len(found)}")
     print(f"Not found ({len(not_found)}): {', '.join(not_found)}")
