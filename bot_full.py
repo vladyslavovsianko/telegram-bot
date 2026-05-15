@@ -451,10 +451,22 @@ async def process_client(message: types.Message, state: FSMContext):
             return await show_multi_client_menu(message, state)
     
     # Обычный режим - один клиент
-    if message.text == "#Test" and message.from_user.id in MANAGER_IDS: 
+    # Проверяем что текст — реальный клиент (защита от текстовых подсказок Telegram)
+    uid = message.from_user.id
+    valid_clients = list(get_user_clients(uid).keys())
+    # Также разрешаем клиентов других работников (через "Другие")
+    data = await state.get_data()
+    other_worker_id = data.get('other_worker_id')
+    if other_worker_id:
+        valid_clients += list(get_user_clients(other_worker_id).keys())
+
+    if message.text == "#Test" and uid in MANAGER_IDS:
         await state.update_data(client="#Test")
-    else: 
+    elif message.text in valid_clients or uid in MANAGER_IDS:
         await state.update_data(client=message.text)
+    else:
+        logging.warning(f"⚠️ Неверный клиент '{message.text}' от {uid}, возврат в меню")
+        return await show_client_menu(message, user_id=uid)
     await check_edit_or_next(message, state, show_media_menu)
 
 async def start_multi_client_selection(message: types.Message, state: FSMContext):
