@@ -1,4 +1,4 @@
-import sys, io
+import sys, io, re
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 from telethon import TelegramClient
 import asyncio
@@ -39,12 +39,17 @@ async def main():
     await client.start()
     print(f"\nSearch {len(SEARCH)} clients...\n")
     
+    def matches(search_term, chat_name):
+        """Точное совпадение с границей слова: 'Toy 8' не совпадает с 'Toy 86'."""
+        escaped = re.escape(search_term)
+        return bool(re.search(r'(?<![A-Za-z0-9])' + escaped + r'(?![A-Za-z0-9])', chat_name))
+
     found = {}       # tag -> (id, name) — первое совпадение
     duplicates = {}  # tag -> [(id, name), ...] — все совпадения
     async for dialog in client.iter_dialogs(limit=None):
         name = dialog.name or ""
         for s in SEARCH:
-            if s in name:
+            if matches(s, name):
                 if s not in found:
                     found[s] = (dialog.id, name)
                     print(f"MATCH [{s}] -> {name} | ID: {dialog.id}")
