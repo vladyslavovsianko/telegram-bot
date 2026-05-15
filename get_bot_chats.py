@@ -13,12 +13,21 @@ import os
 import sqlite3
 import argparse
 from aiogram import Bot
-from dotenv import load_dotenv
 
-load_dotenv()
-
-TOKEN   = os.getenv("BOT_TOKEN")
 DB_FILE = 'bot_database.db'
+
+def _get_setting(key, default=""):
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        row = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+        conn.close()
+        if row and row[0]:
+            return row[0]
+    except Exception:
+        pass
+    return os.getenv(key, default)
+
+TOKEN = _get_setting("BOT_TOKEN")
 
 
 def db_get_all_chat_ids():
