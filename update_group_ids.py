@@ -114,12 +114,33 @@ def normalize(s):
     """Убирает пробелы и приводит к нижнему регистру для сравнения."""
     return re.sub(r'\s+', '', s).lower()
 
+# Переименования тегов: старый тег → (новый тег, правильный chat_id)
+RENAMES = {
+    "#70":    ("Lex 70",  -5211761439),
+    "Lex 92": ("Toy 92",  -5244518625),
+    "Lex113": ("Toy 113", -5245404630),
+    "Lex 113":("Toy 113", -5245404630),
+}
+
 def main():
     conn = sqlite3.connect(DB_FILE)
     # Строим словарь: normalized_tag → chat_id
     norm_map = {normalize(k): v for k, v in FOUND.items()}
 
-    # Получаем все активные клиенты без group_chat_id
+    # 1. Переименования + проставляем ID
+    renamed = []
+    for old_tag, (new_tag, gid) in RENAMES.items():
+        rows = conn.execute(
+            "SELECT id FROM clients WHERE client_tag=?", (old_tag,)
+        ).fetchall()
+        for (row_id,) in rows:
+            conn.execute(
+                "UPDATE clients SET client_tag=?, group_chat_id=? WHERE id=?",
+                (new_tag, gid, row_id)
+            )
+            renamed.append(f"  {old_tag} -> {new_tag} (ID: {gid})")
+
+    # 2. Обновляем group_chat_id для клиентов без него
     rows = conn.execute(
         "SELECT id, client_tag FROM clients WHERE is_active=1 AND (group_chat_id IS NULL OR group_chat_id=0)"
     ).fetchall()
@@ -139,11 +160,16 @@ def main():
     conn.commit()
     conn.close()
 
-    print(f"Updated {len(updated)} clients:")
+    if renamed:
+        print(f"Renamed {len(renamed)} tags:")
+        for line in renamed:
+            print(line)
+
+    print(f"\nUpdated {len(updated)} clients:")
     for line in updated:
         print(line)
 
-    print(f"\nNot found ({len(not_found)}): {', '.join(not_found)}")
+    print(f"\nNot found ({len(not_found)}): {', '.join(not_found) if not_found else 'none'}")
     print("\nDone!")
 
 if __name__ == '__main__':
