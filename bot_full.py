@@ -258,7 +258,7 @@ def make_kb(buttons, rows=2, back=True, manual_text=None, skip=True, done_text=N
     if skip: controls.append(KeyboardButton(text="⏩ Пропустить")) 
     if done_text: controls.append(KeyboardButton(text=done_text))
     if controls: kb.append(controls)
-    return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True, is_persistent=True)
+    return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
 
 def get_calc_control_buttons(show_skip=True):
     builder = InlineKeyboardBuilder()
