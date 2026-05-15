@@ -47,6 +47,11 @@ CHANNEL_POST_DELAY  = int(_get_setting("CHANNEL_POST_DELAY", "120"))
 MANAGER_IDS         = [int(x) for x in _get_setting("MANAGER_IDS", "").split(",") if x.strip()]
 STATUS_MODERATORS   = [int(x) for x in _get_setting("STATUS_MODERATORS", "").split(",") if x.strip()]
 
+# Кто НЕ получает кнопку "Другие" (Олег, Миша М оба аккаунта)
+NO_OTHERS_BTN = {419890021, 610220736, 6776561610}
+# Кто НЕ показывается в списке "Другие" (Олег)
+NO_OTHERS_LIST = {419890021}
+
 # EMPLOYEES_CONFIG перенесён в базу данных (таблицы workers + clients).
 # Управление через веб-панель: http://SERVER_IP:5001/admin
 LOTS_CACHE_FILE = 'lots_cache.json'
@@ -378,6 +383,8 @@ async def show_client_menu(message: types.Message, user_id=None):
         if len(row) == 3: kb_rows.append(row); row = []
     if row: kb_rows.append(row)
     kb_rows.append([KeyboardButton(text="📢 Канал"), KeyboardButton(text="📋 Несколько клиентов")])
+    if user_id not in NO_OTHERS_BTN and user_id not in MANAGER_IDS and user_id not in STATUS_MODERATORS:
+        kb_rows.append([KeyboardButton(text="👥 Другие")])
     kb = ReplyKeyboardMarkup(keyboard=kb_rows, resize_keyboard=True, is_persistent=True)
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id)
     await fsm.set_state(Form.choosing_client)
@@ -390,7 +397,10 @@ async def process_client(message: types.Message, state: FSMContext):
     if message.text == "📋 Несколько клиентов":
         logging.info("▶ Переход в режим множественного выбора")
         return await start_multi_client_selection(message, state)
-    
+
+    if message.text == "👥 Другие":
+        return await show_other_workers_menu(message, state)
+
     if message.text == "📢 Канал":
         logging.info("▶ Режим отправки только в канал")
         await state.update_data(client="📢 Channel", channel_only=True)
@@ -474,7 +484,7 @@ async def show_other_workers_menu(message: types.Message, state: FSMContext):
            WHERE w.user_id != ? AND c.is_active = 1""",
         (current_user_id,)
     )
-    other_ids = [row[0] for row in cursor.fetchall()]
+    other_ids = [row[0] for row in cursor.fetchall() if row[0] not in NO_OTHERS_LIST]
     conn.close()
 
     workers_list = []
