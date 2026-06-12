@@ -26,6 +26,9 @@ ENV/
 # Переменные окружения
 .env
 
+# Секреты Google
+google_credentials.json
+
 # Логи
 *.log
 
