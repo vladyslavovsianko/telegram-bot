@@ -561,17 +561,18 @@ def _uid_from_msg(message) -> int:
 async def _uid_for_show(message) -> int:
     """
     Получает user_id для show_* функций.
-    Если message.from_user недоступен (callback.message) — читает form_user_id из FSM state.
+    Сначала берёт form_user_id из FSM state (надёжно для callback.message,
+    где from_user — это бот, а не пользователь), затем fallback на from_user.id.
     """
-    uid = _uid_from_msg(message)
-    if uid:
-        return uid
     try:
         fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id)
         data = await fsm.get_data()
-        return data.get('form_user_id', 0)
+        uid = data.get('form_user_id', 0)
+        if uid:
+            return uid
     except:
-        return 0
+        pass
+    return _uid_from_msg(message)
 
 
 def _make_inline_kb(buttons, rows=2, back=True, manual_text=None, skip=True, done_text=None):
