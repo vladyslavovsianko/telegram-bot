@@ -1256,6 +1256,8 @@ class _KbProxy:
     """
     Обёртка над callback_query, имитирующая Message для INLINE_KB_USERS.
     Позволяет вызывать существующие text-хендлеры формы без изменений.
+    __getattr__ проксирует все неизвестные методы (answer_photo, answer_media_group и т.д.)
+    к исходному callback.message.
     """
     def __init__(self, cb: types.CallbackQuery, text: str):
         self._cb   = cb
@@ -1270,6 +1272,9 @@ class _KbProxy:
 
     async def reply(self, *args, **kwargs):
         return await self._msg.answer(*args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._msg, name)
 
 
 @dp.callback_query(F.data.startswith("kb:"))
