@@ -565,7 +565,7 @@ def make_kb(buttons, rows=2, back=True, manual_text=None, skip=True, done_text=N
     if skip: controls.append(KeyboardButton(text="⏩ Пропустить")) 
     if done_text: controls.append(KeyboardButton(text=done_text))
     if controls: kb.append(controls)
-    return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
+    return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True, is_persistent=True)
 
 def get_calc_control_buttons(show_skip=True):
     builder = InlineKeyboardBuilder()
@@ -673,7 +673,7 @@ async def show_manager_main_menu(message: types.Message):
     kb = [[KeyboardButton(text="👥 Сотрудники")], [KeyboardButton(text="#Test")]]
     if message.from_user.id == 7982446079:
         kb.append([KeyboardButton(text="⚫️ All Unavailable")])
-    await message.answer("👨‍💼 <b>Панель менеджера:</b>", reply_markup=ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True), parse_mode="HTML")
+    await message.answer("👨‍💼 <b>Панель менеджера:</b>", reply_markup=ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True, is_persistent=True), parse_mode="HTML")
 
 # --- ЛОГИКА АНКЕТЫ ---
 def _sort_key(tag: str):
@@ -1487,7 +1487,7 @@ async def send_final(callback: types.CallbackQuery, state: FSMContext):
 
 async def send_to_channel_only(callback, state, user_id, worker_name, anketa_id, data):
     """Отправка анкеты только в канал (без клиентского чата)"""
-    start_kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🔄 Новые часы")]], resize_keyboard=True)
+    start_kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🔄 Новые часы")]], resize_keyboard=True, is_persistent=True)
     
     pub_fields = build_anketa_fields(data, chrono_label="Market Price (Chrono24)", include_manager=False, include_rating=True, bold_rating=False)
     public_text = f"🟢 <b>Status: Available</b>\n\n👤 <b>{worker_name}</b>\n📢 Channel\n🆔 <b>ID: {anketa_id}</b>\n{pub_fields}\n\n📞 <a href=\"https://t.me/TriL_Support\">Contact Manager</a>"
@@ -1562,7 +1562,7 @@ async def send_to_channel_only(callback, state, user_id, worker_name, anketa_id,
 
 async def send_to_multiple_clients(callback, state, user_id, worker_name, anketa_id, data, multi_clients, client_owner_id, skip_channel=False):
     """Отправка анкеты нескольким клиентам"""
-    start_kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🔄 Новые часы")]], resize_keyboard=True)
+    start_kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🔄 Новые часы")]], resize_keyboard=True, is_persistent=True)
     
     # Формируем список клиентов для отображения
     clients_display = ", ".join(multi_clients)
@@ -1785,7 +1785,7 @@ async def send_to_single_client(callback, state, user_id, worker_name, anketa_id
     chat_link = await make_chat_link(actual_chat_id, chat_msg_id)
 
     # Кнопки для работника
-    start_kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🔄 Новые часы")]], resize_keyboard=True)
+    start_kb = ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="🔄 Новые часы")]], resize_keyboard=True, is_persistent=True)
     worker_msg = await callback.message.answer(f"✅ <b>Отправлено!</b>\n🆔 <b>ID: {anketa_id}</b>", reply_markup=start_kb, parse_mode="HTML")
     
 
