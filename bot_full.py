@@ -558,6 +558,22 @@ def _uid_from_msg(message) -> int:
     except: return 0
 
 
+async def _uid_for_show(message) -> int:
+    """
+    Получает user_id для show_* функций.
+    Если message.from_user недоступен (callback.message) — читает form_user_id из FSM state.
+    """
+    uid = _uid_from_msg(message)
+    if uid:
+        return uid
+    try:
+        fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id)
+        data = await fsm.get_data()
+        return data.get('form_user_id', 0)
+    except:
+        return 0
+
+
 def _make_inline_kb(buttons, rows=2, back=True, manual_text=None, skip=True, done_text=None):
     """InlineKeyboard-версия make_kb с callback_data='kb:<text>'."""
     builder = InlineKeyboardBuilder()
@@ -755,6 +771,9 @@ async def callback_client_menu(callback: types.CallbackQuery, state: FSMContext)
     val = callback.data[4:]
     uid = callback.from_user.id
 
+    # Сохраняем user_id для show_* функций, которые вызываются через callback.message
+    await state.update_data(form_user_id=uid)
+
     if val == "__channel__":
         await state.update_data(client="📢 Channel", channel_only=True)
         return await check_edit_or_next(callback.message, state, show_media_menu)
@@ -828,6 +847,7 @@ async def process_client(message: types.Message, state: FSMContext):
 
     # Обычный режим — один клиент (ReplyKeyboard, для не-INLINE пользователей)
     uid = message.from_user.id
+    await state.update_data(form_user_id=uid)
     valid_clients = list(get_user_clients(uid).keys())
     other_worker_id = data.get('other_worker_id')
     if other_worker_id:
@@ -952,7 +972,7 @@ async def process_other_worker_client(message: types.Message, state: FSMContext)
 
 async def show_media_menu(message):
     chat_id = message.chat.id
-    kb = make_kb([], rows=1, back=True, done_text="✅ Все файлы загружены", skip=False, user_id=_uid_from_msg(message))
+    kb = make_kb([], rows=1, back=True, done_text="✅ Все файлы загружены", skip=False, user_id=await _uid_for_show(message))
     fsm = dp.fsm.get_context(bot, chat_id, chat_id)
     await fsm.set_state(Form.uploading_media)
     await bot.send_message(chat_id, "📸 <b>Скинь фото и видео:</b>", reply_markup=kb, parse_mode="HTML")
@@ -1086,7 +1106,7 @@ async def process_text_input(message: types.Message, state: FSMContext):
         await check_edit_or_next(message, state, show_kit_menu)
 
 async def show_negotiation_menu(message):
-    kb = make_kb(["✅ Да", "❌ Нет"], rows=2, back=True, skip=True, user_id=_uid_from_msg(message))
+    kb = make_kb(["✅ Да", "❌ Нет"], rows=2, back=True, skip=True, user_id=await _uid_for_show(message))
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id)
     await fsm.set_state(Form.choosing_negotiation); await bot.send_message(message.chat.id, "6️⃣ <b>Скидка:</b>", reply_markup=kb, parse_mode="HTML")
 
@@ -1104,7 +1124,7 @@ async def process_negotiation(message: types.Message, state: FSMContext):
     await state.update_data(negotiation=val); await check_edit_or_next(message, state, show_year_menu)
 
 async def show_year_menu(message):
-    kb = make_kb(["60s", "70s", "80s", "90s", "00s", "10s", "20s"], rows=4, back=True, manual_text="✍️ Вручную", skip=True, user_id=_uid_from_msg(message))
+    kb = make_kb(["60s", "70s", "80s", "90s", "00s", "10s", "20s"], rows=4, back=True, manual_text="✍️ Вручную", skip=True, user_id=await _uid_for_show(message))
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id); await fsm.set_state(Form.choosing_year); await bot.send_message(message.chat.id, "7️⃣ <b>Год выпуска:</b>", reply_markup=kb, parse_mode="HTML")
 
 @dp.message(Form.choosing_year)
@@ -1118,7 +1138,7 @@ async def process_year(message: types.Message, state: FSMContext):
     val = "—" if message.text == "⏩ Пропустить" else message.text; await state.update_data(year=val); await check_edit_or_next(message, state, show_diameter_menu)
 
 async def show_diameter_menu(message):
-    kb = make_kb([str(x) for x in range(26, 49)], rows=6, back=True, manual_text="✍️ Вручную", skip=True, user_id=_uid_from_msg(message))
+    kb = make_kb([str(x) for x in range(26, 49)], rows=6, back=True, manual_text="✍️ Вручную", skip=True, user_id=await _uid_for_show(message))
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id); await fsm.set_state(Form.choosing_diameter); await bot.send_message(message.chat.id, "8️⃣ <b>Диаметр (мм):</b>", reply_markup=kb, parse_mode="HTML")
 
 @dp.message(Form.choosing_diameter)
@@ -1134,7 +1154,7 @@ async def process_diameter(message: types.Message, state: FSMContext):
 async def show_wrist_menu(message):
     wrists = []; val = 15.0
     while val <= 25.0: wrists.append(str(val).replace(".0", "")); val += 0.5
-    kb = make_kb(wrists, rows=5, back=True, manual_text="✍️ Вручную", skip=True, user_id=_uid_from_msg(message))
+    kb = make_kb(wrists, rows=5, back=True, manual_text="✍️ Вручную", skip=True, user_id=await _uid_for_show(message))
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id); await fsm.set_state(Form.choosing_wrist); await bot.send_message(message.chat.id, "9️⃣ <b>Размер запястья (см):</b>", reply_markup=kb, parse_mode="HTML")
 
 @dp.message(Form.choosing_wrist)
@@ -1148,7 +1168,7 @@ async def process_wrist(message: types.Message, state: FSMContext):
     val = "—" if message.text == "⏩ Пропустить" else message.text; await state.update_data(wrist=val); await check_edit_or_next(message, state, show_kit_menu)
 
 async def show_kit_menu(message):
-    kb = make_kb(["📦 Фул сет", "🎁 Только коробка", "📄 Только доки", "⌚️ Только часы"], rows=2, back=True, skip=True, user_id=_uid_from_msg(message))
+    kb = make_kb(["📦 Фул сет", "🎁 Только коробка", "📄 Только доки", "⌚️ Только часы"], rows=2, back=True, skip=True, user_id=await _uid_for_show(message))
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id); await fsm.set_state(Form.choosing_kit); await bot.send_message(message.chat.id, "🔟 <b>Комплект:</b>", reply_markup=kb, parse_mode="HTML")
 
 @dp.message(Form.choosing_kit)
@@ -1162,7 +1182,7 @@ async def process_kit(message: types.Message, state: FSMContext):
     await state.update_data(kit=val); await check_edit_or_next(message, state, show_condition_menu)
 
 async def show_condition_menu(message):
-    kb = make_kb(["🆕 Новые", "💎 Отличное", "👌 Хорошее", "📦 Удовлетворительное", "💀 Плохое"], rows=2, back=True, skip=True, user_id=_uid_from_msg(message))
+    kb = make_kb(["🆕 Новые", "💎 Отличное", "👌 Хорошее", "📦 Удовлетворительное", "💀 Плохое"], rows=2, back=True, skip=True, user_id=await _uid_for_show(message))
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id); await fsm.set_state(Form.choosing_condition); await bot.send_message(message.chat.id, "1️⃣1️⃣ <b>Состояние:</b>", reply_markup=kb, parse_mode="HTML")
 
 @dp.message(Form.choosing_condition)
@@ -1182,7 +1202,7 @@ async def process_condition(message: types.Message, state: FSMContext):
     await state.update_data(condition=val); await check_edit_or_next(message, state, ask_material)
 
 async def ask_material(message):
-    kb = make_kb([], rows=1, back=True, skip=True, user_id=_uid_from_msg(message))
+    kb = make_kb([], rows=1, back=True, skip=True, user_id=await _uid_for_show(message))
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id); await fsm.set_state(Form.entering_material); await bot.send_message(message.chat.id, "🪨 <b>Материал (Material):</b>", reply_markup=kb, parse_mode="HTML")
 
 @dp.message(Form.entering_material)
@@ -1196,7 +1216,7 @@ async def process_material(message: types.Message, state: FSMContext):
     await state.update_data(material=val); await check_edit_or_next(message, state, ask_manager_comment)
 
 async def ask_manager_comment(message):
-    kb = make_kb([], rows=1, back=True, skip=True, user_id=_uid_from_msg(message))
+    kb = make_kb([], rows=1, back=True, skip=True, user_id=await _uid_for_show(message))
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id); await fsm.set_state(Form.entering_manager_comment); await bot.send_message(message.chat.id, "💬 <b>Комментарий менеджера (Manager comment):</b>", reply_markup=kb, parse_mode="HTML")
 
 @dp.message(Form.entering_manager_comment)
@@ -1210,7 +1230,7 @@ async def process_manager_comment(message: types.Message, state: FSMContext):
     await state.update_data(manager_comment=val); await check_edit_or_next(message, state, show_worker_rating_menu)
 
 async def show_worker_rating_menu(message):
-    kb = make_kb(["✅ Рекомендую", "👌 Нормально", "❌ Не рекомендую"], rows=3, back=True, skip=True, user_id=_uid_from_msg(message))
+    kb = make_kb(["✅ Рекомендую", "👌 Нормально", "❌ Не рекомендую"], rows=3, back=True, skip=True, user_id=await _uid_for_show(message))
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id); await fsm.set_state(Form.choosing_worker_rating); await bot.send_message(message.chat.id, "1️⃣2️⃣ <b>Твоя оценка (для менеджера):</b>", reply_markup=kb, parse_mode="HTML")
 
 @dp.message(Form.choosing_worker_rating)
