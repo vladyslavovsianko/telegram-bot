@@ -552,7 +552,32 @@ def get_client_group_chat(user_id, client_tag):
     # Если старый формат или нет данных
     return TARGET_CHAT_ID
 
-def make_kb(buttons, rows=2, back=True, manual_text=None, skip=True, done_text=None):
+def _uid_from_msg(message) -> int:
+    """Безопасно получает user_id из message или proxy."""
+    try: return message.from_user.id
+    except: return 0
+
+
+def _make_inline_kb(buttons, rows=2, back=True, manual_text=None, skip=True, done_text=None):
+    """InlineKeyboard-версия make_kb с callback_data='kb:<text>'."""
+    builder = InlineKeyboardBuilder()
+    for btn in buttons:
+        builder.button(text=btn, callback_data=f"kb:{btn}")
+    if buttons:
+        builder.adjust(rows)
+    controls = []
+    if back:        controls.append(InlineKeyboardButton(text="🔙 Назад",      callback_data="kb:🔙 Назад"))
+    if manual_text: controls.append(InlineKeyboardButton(text=manual_text,   callback_data=f"kb:{manual_text}"))
+    if skip:        controls.append(InlineKeyboardButton(text="⏩ Пропустить", callback_data="kb:⏩ Пропустить"))
+    if done_text:   controls.append(InlineKeyboardButton(text=done_text,      callback_data=f"kb:{done_text}"))
+    if controls:
+        builder.row(*controls)
+    return builder.as_markup()
+
+
+def make_kb(buttons, rows=2, back=True, manual_text=None, skip=True, done_text=None, user_id=None):
+    if user_id and user_id in INLINE_KB_USERS:
+        return _make_inline_kb(buttons, rows, back, manual_text, skip, done_text)
     kb = []
     row = []
     for btn in buttons:
@@ -562,7 +587,7 @@ def make_kb(buttons, rows=2, back=True, manual_text=None, skip=True, done_text=N
     controls = []
     if back: controls.append(KeyboardButton(text="🔙 Назад"))
     if manual_text: controls.append(KeyboardButton(text=manual_text))
-    if skip: controls.append(KeyboardButton(text="⏩ Пропустить")) 
+    if skip: controls.append(KeyboardButton(text="⏩ Пропустить"))
     if done_text: controls.append(KeyboardButton(text=done_text))
     if controls: kb.append(controls)
     return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True, is_persistent=True)
@@ -927,7 +952,7 @@ async def process_other_worker_client(message: types.Message, state: FSMContext)
 
 async def show_media_menu(message):
     chat_id = message.chat.id
-    kb = make_kb([], rows=1, back=True, done_text="✅ Все файлы загружены", skip=False)
+    kb = make_kb([], rows=1, back=True, done_text="✅ Все файлы загружены", skip=False, user_id=_uid_from_msg(message))
     fsm = dp.fsm.get_context(bot, chat_id, chat_id)
     await fsm.set_state(Form.uploading_media)
     await bot.send_message(chat_id, "📸 <b>Скинь фото и видео:</b>", reply_markup=kb, parse_mode="HTML")
@@ -1061,7 +1086,7 @@ async def process_text_input(message: types.Message, state: FSMContext):
         await check_edit_or_next(message, state, show_kit_menu)
 
 async def show_negotiation_menu(message):
-    kb = make_kb(["✅ Да", "❌ Нет"], rows=2, back=True, skip=True)
+    kb = make_kb(["✅ Да", "❌ Нет"], rows=2, back=True, skip=True, user_id=_uid_from_msg(message))
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id)
     await fsm.set_state(Form.choosing_negotiation); await bot.send_message(message.chat.id, "6️⃣ <b>Скидка:</b>", reply_markup=kb, parse_mode="HTML")
 
@@ -1079,7 +1104,7 @@ async def process_negotiation(message: types.Message, state: FSMContext):
     await state.update_data(negotiation=val); await check_edit_or_next(message, state, show_year_menu)
 
 async def show_year_menu(message):
-    kb = make_kb(["60s", "70s", "80s", "90s", "00s", "10s", "20s"], rows=4, back=True, manual_text="✍️ Вручную", skip=True)
+    kb = make_kb(["60s", "70s", "80s", "90s", "00s", "10s", "20s"], rows=4, back=True, manual_text="✍️ Вручную", skip=True, user_id=_uid_from_msg(message))
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id); await fsm.set_state(Form.choosing_year); await bot.send_message(message.chat.id, "7️⃣ <b>Год выпуска:</b>", reply_markup=kb, parse_mode="HTML")
 
 @dp.message(Form.choosing_year)
@@ -1093,7 +1118,7 @@ async def process_year(message: types.Message, state: FSMContext):
     val = "—" if message.text == "⏩ Пропустить" else message.text; await state.update_data(year=val); await check_edit_or_next(message, state, show_diameter_menu)
 
 async def show_diameter_menu(message):
-    kb = make_kb([str(x) for x in range(26, 49)], rows=6, back=True, manual_text="✍️ Вручную", skip=True)
+    kb = make_kb([str(x) for x in range(26, 49)], rows=6, back=True, manual_text="✍️ Вручную", skip=True, user_id=_uid_from_msg(message))
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id); await fsm.set_state(Form.choosing_diameter); await bot.send_message(message.chat.id, "8️⃣ <b>Диаметр (мм):</b>", reply_markup=kb, parse_mode="HTML")
 
 @dp.message(Form.choosing_diameter)
@@ -1109,7 +1134,7 @@ async def process_diameter(message: types.Message, state: FSMContext):
 async def show_wrist_menu(message):
     wrists = []; val = 15.0
     while val <= 25.0: wrists.append(str(val).replace(".0", "")); val += 0.5
-    kb = make_kb(wrists, rows=5, back=True, manual_text="✍️ Вручную", skip=True)
+    kb = make_kb(wrists, rows=5, back=True, manual_text="✍️ Вручную", skip=True, user_id=_uid_from_msg(message))
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id); await fsm.set_state(Form.choosing_wrist); await bot.send_message(message.chat.id, "9️⃣ <b>Размер запястья (см):</b>", reply_markup=kb, parse_mode="HTML")
 
 @dp.message(Form.choosing_wrist)
@@ -1123,7 +1148,7 @@ async def process_wrist(message: types.Message, state: FSMContext):
     val = "—" if message.text == "⏩ Пропустить" else message.text; await state.update_data(wrist=val); await check_edit_or_next(message, state, show_kit_menu)
 
 async def show_kit_menu(message):
-    kb = make_kb(["📦 Фул сет", "🎁 Только коробка", "📄 Только доки", "⌚️ Только часы"], rows=2, back=True, skip=True)
+    kb = make_kb(["📦 Фул сет", "🎁 Только коробка", "📄 Только доки", "⌚️ Только часы"], rows=2, back=True, skip=True, user_id=_uid_from_msg(message))
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id); await fsm.set_state(Form.choosing_kit); await bot.send_message(message.chat.id, "🔟 <b>Комплект:</b>", reply_markup=kb, parse_mode="HTML")
 
 @dp.message(Form.choosing_kit)
@@ -1137,7 +1162,7 @@ async def process_kit(message: types.Message, state: FSMContext):
     await state.update_data(kit=val); await check_edit_or_next(message, state, show_condition_menu)
 
 async def show_condition_menu(message):
-    kb = make_kb(["🆕 Новые", "💎 Отличное", "👌 Хорошее", "📦 Удовлетворительное", "💀 Плохое"], rows=2, back=True, skip=True)
+    kb = make_kb(["🆕 Новые", "💎 Отличное", "👌 Хорошее", "📦 Удовлетворительное", "💀 Плохое"], rows=2, back=True, skip=True, user_id=_uid_from_msg(message))
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id); await fsm.set_state(Form.choosing_condition); await bot.send_message(message.chat.id, "1️⃣1️⃣ <b>Состояние:</b>", reply_markup=kb, parse_mode="HTML")
 
 @dp.message(Form.choosing_condition)
@@ -1157,7 +1182,7 @@ async def process_condition(message: types.Message, state: FSMContext):
     await state.update_data(condition=val); await check_edit_or_next(message, state, ask_material)
 
 async def ask_material(message):
-    kb = make_kb([], rows=1, back=True, skip=True)
+    kb = make_kb([], rows=1, back=True, skip=True, user_id=_uid_from_msg(message))
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id); await fsm.set_state(Form.entering_material); await bot.send_message(message.chat.id, "🪨 <b>Материал (Material):</b>", reply_markup=kb, parse_mode="HTML")
 
 @dp.message(Form.entering_material)
@@ -1171,7 +1196,7 @@ async def process_material(message: types.Message, state: FSMContext):
     await state.update_data(material=val); await check_edit_or_next(message, state, ask_manager_comment)
 
 async def ask_manager_comment(message):
-    kb = make_kb([], rows=1, back=True, skip=True)
+    kb = make_kb([], rows=1, back=True, skip=True, user_id=_uid_from_msg(message))
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id); await fsm.set_state(Form.entering_manager_comment); await bot.send_message(message.chat.id, "💬 <b>Комментарий менеджера (Manager comment):</b>", reply_markup=kb, parse_mode="HTML")
 
 @dp.message(Form.entering_manager_comment)
@@ -1185,7 +1210,7 @@ async def process_manager_comment(message: types.Message, state: FSMContext):
     await state.update_data(manager_comment=val); await check_edit_or_next(message, state, show_worker_rating_menu)
 
 async def show_worker_rating_menu(message):
-    kb = make_kb(["✅ Рекомендую", "👌 Нормально", "❌ Не рекомендую"], rows=3, back=True, skip=True)
+    kb = make_kb(["✅ Рекомендую", "👌 Нормально", "❌ Не рекомендую"], rows=3, back=True, skip=True, user_id=_uid_from_msg(message))
     fsm = dp.fsm.get_context(bot, message.chat.id, message.chat.id); await fsm.set_state(Form.choosing_worker_rating); await bot.send_message(message.chat.id, "1️⃣2️⃣ <b>Твоя оценка (для менеджера):</b>", reply_markup=kb, parse_mode="HTML")
 
 @dp.message(Form.choosing_worker_rating)
@@ -1201,6 +1226,78 @@ async def process_rating(message: types.Message, state: FSMContext):
     elif message.text == "👌 Нормально": val = "👌 OK"
     elif message.text == "❌ Не рекомендую": val = "❌ Not recommended"
     await state.update_data(rating=val); await show_final_review(message, state)
+
+# ==========================================
+# INLINE KB PROXY — universal handler
+# ==========================================
+
+class _KbProxy:
+    """
+    Обёртка над callback_query, имитирующая Message для INLINE_KB_USERS.
+    Позволяет вызывать существующие text-хендлеры формы без изменений.
+    """
+    def __init__(self, cb: types.CallbackQuery, text: str):
+        self._cb   = cb
+        self._msg  = cb.message
+        self.text  = text
+        self.chat  = cb.message.chat
+        self.from_user = cb.from_user
+        self.message_id = cb.message.message_id
+
+    async def answer(self, *args, **kwargs):
+        return await self._msg.answer(*args, **kwargs)
+
+    async def reply(self, *args, **kwargs):
+        return await self._msg.answer(*args, **kwargs)
+
+
+@dp.callback_query(F.data.startswith("kb:"))
+async def universal_kb_callback(callback: types.CallbackQuery, state: FSMContext):
+    """Единый хендлер для InlineKeyboard-кнопок формы (INLINE_KB_USERS)."""
+    await callback.answer()
+    text = callback.data[len("kb:"):]
+    proxy = _KbProxy(callback, text)
+    curr  = await state.get_state()
+
+    if curr == Form.uploading_media:
+        if text == "🔙 Назад":
+            data = await state.get_data()
+            if data.get("editing_mode"):
+                return await show_final_review(proxy, state)
+            return await show_client_menu(proxy)
+        if text == "✅ Все файлы загружены":
+            data = await state.get_data()
+            if not data.get("media_files"):
+                return await proxy.answer("⛔️ Загрузи хотя бы 1 фото.")
+            return await check_edit_or_next(proxy, state, lambda m: start_calculator(m, state, Form.entering_table, "3️⃣ <b>Введи номер СТОЛА:</b>", allow_skip=True))
+
+    elif curr == Form.choosing_negotiation:
+        await process_negotiation(proxy, state)
+
+    elif curr == Form.choosing_year:
+        await process_year(proxy, state)
+
+    elif curr == Form.choosing_diameter:
+        await process_diameter(proxy, state)
+
+    elif curr == Form.choosing_wrist:
+        await process_wrist(proxy, state)
+
+    elif curr == Form.choosing_kit:
+        await process_kit(proxy, state)
+
+    elif curr == Form.choosing_condition:
+        await process_condition(proxy, state)
+
+    elif curr == Form.entering_material:
+        await process_material(proxy, state)
+
+    elif curr == Form.entering_manager_comment:
+        await process_manager_comment(proxy, state)
+
+    elif curr == Form.choosing_worker_rating:
+        await process_rating(proxy, state)
+
 
 # ==========================================
 # 8. ПРОВЕРКА И ОТПРАВКА
@@ -1721,7 +1818,7 @@ async def repeat_same_clients(callback: types.CallbackQuery, state: FSMContext):
     await fsm.set_state(Form.uploading_media)
     await callback.message.answer(
         f"📸 <b>Загрузи фото/видео для новой анкеты</b>\n👥 Клиенты: {', '.join(clients)}",
-        reply_markup=make_kb([], rows=1, back=True, done_text="✅ Все файлы загружены", skip=False),
+        reply_markup=make_kb([], rows=1, back=True, done_text="✅ Все файлы загружены", skip=False, user_id=callback.from_user.id),
         parse_mode="HTML"
     )
 
