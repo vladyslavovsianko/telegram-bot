@@ -5,7 +5,10 @@ import os
 import io
 import json
 import sqlite3
+import base64
+import re as _re
 from contextlib import suppress
+from io import BytesIO
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
@@ -18,6 +21,7 @@ from dotenv import load_dotenv
 
 # .env используется только как резервный источник если БД недоступна
 load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), 'match', '.env'), override=False)
 
 DB_FILE = 'bot_database.db'
 
@@ -79,6 +83,307 @@ def load_lots_cache():
     except Exception as e:
         logging.error(f"Ошибка загрузки LOTS_CACHE: {e}")
         LOTS_CACHE = {}
+
+# ==========================================
+# MATCH — настройки AI-матчинга часов
+# ==========================================
+_OPENAI_KEY      = os.getenv("OPENAI_API_KEY", "")
+_AIRTABLE_KEY    = os.getenv("AIRTABLE_API_KEY", "")
+_AIRTABLE_BASE   = os.getenv("AIRTABLE_BASE_ID", "")
+_SERPAPI_KEY     = os.getenv("SERPAPI_KEY", "")
+MATCH_REPORT_CHAT = -5238817358   # группа куда идут логи и совпадения
+
+# Кэш заявок клиентов из Airtable (обновляется каждые 30 минут)
+_match_requests_cache: list[dict] = []
+# Буферы для album-постов из канала
+_match_album_buffer: dict[str, list[bytes]] = {}
+_match_album_tasks:  dict[str, asyncio.Task] = {}
+_match_album_meta:   dict[str, dict] = {}
+_ALBUM_WAIT    = 1.5
+_MAX_ALBUM     = 3
+_CACHE_REFRESH = 30 * 60
+
+# ==========================================
+# MATCH — вспомогательные функции
+# ==========================================
+
+def _md_escape(text: str) -> str:
+    return _re.sub(r"([_*\[\]()~`>#+=|{}.!\\-])", r"\\\1", text)
+
+
+def _channel_post_link(message: types.Message) -> str:
+    if message.chat.username:
+        return f"https://t\\.me/{message.chat.username}/{message.message_id}"
+    cid = str(message.chat.id).lstrip("-").removeprefix("100")
+    return f"https://t\\.me/c/{cid}/{message.message_id}"
+
+
+def _get_client_group_id(client_tag: str) -> int | None:
+    """Ищет group_chat_id клиента по client_tag в SQLite."""
+    if not client_tag:
+        return None
+    try:
+        conn = sqlite3.connect(DB_FILE, timeout=5)
+        row = conn.execute(
+            "SELECT group_chat_id FROM clients WHERE client_tag = ? AND is_active = 1 LIMIT 1",
+            (client_tag,)
+        ).fetchone()
+        conn.close()
+        return row[0] if row and row[0] else None
+    except Exception as exc:
+        logging.warning("SQLite lookup failed for '%s': %s", client_tag, exc)
+        return None
+
+
+def _upload_to_temp_host(image_bytes: bytes) -> str:
+    try:
+        import requests as _req
+        resp = _req.post(
+            "https://0x0.st",
+            files={"file": ("collage.jpg", image_bytes, "image/jpeg")},
+            timeout=15,
+        )
+        if resp.status_code == 200:
+            return resp.text.strip()
+    except Exception:
+        logging.warning("Temp image upload failed", exc_info=True)
+    return ""
+
+
+def _get_lens_hint(image_bytes: bytes) -> str:
+    if not _SERPAPI_KEY:
+        return ""
+    try:
+        from serpapi import GoogleSearch
+        url = _upload_to_temp_host(image_bytes)
+        if not url:
+            return ""
+        results = GoogleSearch(
+            {"engine": "google_lens", "url": url, "api_key": _SERPAPI_KEY}
+        ).get_dict()
+        matches = results.get("visual_matches", [])
+        if matches:
+            logging.info("Lens топ: %s", " | ".join(m.get("title", "") for m in matches[:3]))
+            return matches[0].get("title", "")
+    except Exception:
+        logging.warning("Google Lens failed", exc_info=True)
+    return ""
+
+
+def _visual_compare(telegram_b64: str, airtable_bytes: bytes,
+                    lens_hint: str = "", brand: str = "",
+                    details: str = "", notes: str = "") -> dict:
+    from openai import OpenAI
+    client = OpenAI(api_key=_OPENAI_KEY)
+    airtable_b64 = base64.b64encode(airtable_bytes).decode("utf-8")
+    hint_line = f"Google Lens подсказывает: {lens_hint}. " if lens_hint else ""
+    client_info = ""
+    if brand or details:
+        parts = []
+        if brand:   parts.append(f"Бренд: {brand}")
+        if details: parts.append(f"Детали: {details}")
+        client_info = "Запрос клиента:\n" + "\n".join(f"  • {p}" for p in parts) + "\n"
+    notes_block = f"⚠️ ОСОБЫЕ ИНСТРУКЦИИ (приоритет):\n{notes}\n" if notes else ""
+    prompt = (
+        "Перед тобой два изображения. "
+        "Первое — фото лота из Telegram-канала. "
+        "Второе — фото желаемых часов от клиента.\n"
+        f"{hint_line}{client_info}{notes_block}"
+        "Визуально сравни часы по бренду, модели, циферблату, безелю, материалу браслета.\n"
+        "Верни JSON: 'score' (0-100), 'status' ('Match'>=70, 'Partial' 50-69, 'No Match'<50), 'reason' (на русском)."
+    )
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        response_format={"type": "json_object"},
+        messages=[
+            {"role": "system", "content": "Ты эксперт по швейцарским часам. Отвечай строго в JSON."},
+            {"role": "user", "content": [
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{telegram_b64}", "detail": "high"}},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{airtable_b64}", "detail": "high"}},
+                {"type": "text", "text": prompt},
+            ]},
+        ],
+    )
+    return json.loads(response.choices[0].message.content)
+
+
+def _get_active_requests() -> list[dict]:
+    import requests as _req
+    from pyairtable import Api as AirtableApi
+    api = AirtableApi(_AIRTABLE_KEY)
+    table = api.table(_AIRTABLE_BASE, "Client Requests")
+    records = table.all(formula="Status = 'Active'")
+    result = []
+    for record in records:
+        fields = record.get("fields", {})
+        photo_bytes = None
+        attachments = fields.get("Photo", [])
+        if attachments and isinstance(attachments, list):
+            url = attachments[0].get("url", "")
+            if url:
+                try:
+                    r = _req.get(url, timeout=15)
+                    if r.status_code == 200:
+                        photo_bytes = r.content
+                except Exception:
+                    pass
+        result.append({
+            "client_id":   fields.get("Client ID", ""),
+            "budget":      fields.get("Budget", ""),
+            "brand":       fields.get("Brand", ""),
+            "details":     fields.get("Watch Details", ""),
+            "notes":       fields.get("Notes", ""),
+            "photo_bytes": photo_bytes,
+        })
+    return result
+
+
+def _build_collage(images: list[bytes]) -> bytes:
+    from PIL import Image
+    if len(images) == 1:
+        return images[0]
+    pil_imgs = [Image.open(BytesIO(b)).convert("RGB") for b in images]
+    h = min(i.height for i in pil_imgs)
+    resized = [i.resize((max(1, int(i.width * h / i.height)), h), Image.LANCZOS) for i in pil_imgs]
+    collage = Image.new("RGB", (sum(i.width for i in resized), h))
+    x = 0
+    for i in resized:
+        collage.paste(i, (x, 0)); x += i.width
+    out = BytesIO(); collage.save(out, format="JPEG", quality=90)
+    return out.getvalue()
+
+
+def _build_match_msg_report(req: dict, reason: str, post_link: str, score: int | None) -> str:
+    lines = ["🚨 *Найдено визуальное совпадение\\!*", ""]
+    if post_link:
+        lines.append(f"📎 [Открыть пост в канале]({post_link})")
+        lines.append("")
+    lines.append(f"👤 Клиент: `{_md_escape(str(req.get('client_id', '?')))}`")
+    if req.get("brand"):   lines.append(f"⌚ Бренд: {_md_escape(req['brand'])}")
+    if req.get("details"): lines.append(f"📋 Запрос: {_md_escape(req['details'])}")
+    if req.get("budget"):  lines.append(f"💰 Бюджет: {_md_escape(str(req['budget']))}")
+    if score is not None:  lines.append(f"📊 Сходство: *{score}%*")
+    lines.append(f"🤖 {_md_escape(reason)}")
+    return "\n".join(lines)
+
+
+def _build_match_msg_client(req: dict, post_link: str, score: int | None) -> str:
+    lines = ["🎯 *Найдены часы по вашему запросу\\!*", ""]
+    if post_link:
+        lines.append(f"📎 [Смотреть в канале →]({post_link})")
+        lines.append("")
+    if req.get("brand"):  lines.append(f"⌚ {_md_escape(req['brand'])}")
+    if score is not None: lines.append(f"📊 Сходство: *{score}%*")
+    lines.append(f"\n_{_md_escape(req.get('details', '')[:100])}_" if req.get("details") else "")
+    return "\n".join(l for l in lines if l is not None)
+
+
+async def _run_match_pipeline(photos: list[bytes], send_report, post_link: str = "") -> None:
+    collage = await asyncio.to_thread(_build_collage, photos)
+    b64 = base64.b64encode(collage).decode("utf-8")
+    lens_hint = ""
+    try:
+        lens_hint = await asyncio.to_thread(_get_lens_hint, collage)
+    except Exception:
+        pass
+
+    active = _match_requests_cache
+    if not active:
+        logging.warning("Match: кэш заявок пуст")
+        return
+
+    for req in active:
+        client_id = req.get("client_id", "?")
+        photo_bytes = req.get("photo_bytes")
+        if not photo_bytes:
+            continue
+        try:
+            result = await asyncio.to_thread(
+                _visual_compare, b64, photo_bytes, lens_hint,
+                req.get("brand", ""), req.get("details", ""), req.get("notes", ""),
+            )
+        except Exception:
+            logging.exception("visual_compare error for %s", client_id)
+            continue
+
+        status = result.get("status", "No Match")
+        reason = result.get("reason", "")
+        score  = result.get("score")
+        logging.info("Match %s → %s (%s%%)", client_id, status, score)
+
+        if status == "Match":
+            report_text = _build_match_msg_report(req, reason, post_link, score)
+            await send_report(report_text)
+            # Отправляем в группу клиента через основной бот
+            group_id = _get_client_group_id(str(client_id))
+            if group_id:
+                client_text = _build_match_msg_client(req, post_link, score)
+                try:
+                    await bot.send_message(group_id, client_text,
+                                           parse_mode="MarkdownV2",
+                                           disable_web_page_preview=True)
+                    logging.info("Match sent to group %s for client '%s'", group_id, client_id)
+                except Exception as exc:
+                    logging.warning("Failed to send match to group %s: %s", group_id, exc)
+
+
+async def _flush_match_album(key: str) -> None:
+    await asyncio.sleep(_ALBUM_WAIT)
+    photos = _match_album_buffer.pop(key, [])
+    meta   = _match_album_meta.pop(key, {})
+    _match_album_tasks.pop(key, None)
+    if not photos:
+        return
+    await _run_match_pipeline(photos, meta["send_report"], meta.get("post_link", ""))
+
+
+async def handle_channel_photo(message: types.Message) -> None:
+    """Хендлер фото из отслеживаемого канала — запускает AI-матчинг."""
+    if TARGET_CHANNEL_ID and message.chat.id != TARGET_CHANNEL_ID:
+        return
+    if not MATCH_REPORT_CHAT:
+        return
+
+    buf = BytesIO()
+    await bot.download(message.photo[-1], destination=buf)
+    link = _channel_post_link(message)
+
+    async def send_report(text: str) -> None:
+        try:
+            await bot.send_message(MATCH_REPORT_CHAT, text,
+                                   parse_mode="MarkdownV2",
+                                   disable_web_page_preview=True)
+        except Exception as exc:
+            logging.warning("send_report failed: %s", exc)
+
+    mgid = message.media_group_id
+    if mgid:
+        key = f"{message.chat.id}_{mgid}"
+        if key not in _match_album_buffer:
+            _match_album_buffer[key] = []
+            _match_album_meta[key] = {"send_report": send_report, "post_link": link}
+        if len(_match_album_buffer[key]) < _MAX_ALBUM:
+            _match_album_buffer[key].append(buf.getvalue())
+        if key not in _match_album_tasks:
+            _match_album_tasks[key] = asyncio.create_task(_flush_match_album(key))
+    else:
+        await _run_match_pipeline([buf.getvalue()], send_report, link)
+
+
+async def _match_cache_refresh_loop() -> None:
+    global _match_requests_cache
+    while True:
+        await asyncio.sleep(_CACHE_REFRESH)
+        try:
+            fresh = await asyncio.to_thread(_get_active_requests)
+            _match_requests_cache = fresh
+            logging.info("Match кэш обновлён: %d клиентов, %d с фото",
+                         len(fresh), sum(1 for r in fresh if r.get("photo_bytes")))
+        except Exception:
+            logging.exception("Не удалось обновить кэш клиентов")
+
+
+
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=TOKEN)
@@ -1855,13 +2160,42 @@ async def m_send(m: types.Message, state: FSMContext):
 @dp.message(F.text == "🔄 Новые часы", StateFilter('*'))
 async def new_cycle(m: types.Message, state: FSMContext): await restart_logic(m, state)
 
+@dp.channel_post(F.photo)
+async def on_channel_photo(message: types.Message):
+    await handle_channel_photo(message)
+
+
+
 async def main():
-    init_db() # АВТО-ЗАПУСК СОЗДАНИЯ ТАБЛИЦ
-    load_lots_cache()  # Загрузка кэша лотов после перезапуска
-    logging.info("Bot started (v104: Persistent LOTS_CACHE)")
+    global _match_requests_cache
+    init_db()
+    load_lots_cache()
+    logging.info("Bot started (v105: match integrated)")
     logging.info(f"📢 TARGET_CHANNEL_ID={TARGET_CHANNEL_ID}")
     logging.info(f"💬 TARGET_CHAT_ID={TARGET_CHAT_ID}")
     logging.info(f"⭐ VIP_GROUP_ID={VIP_GROUP_ID}")
-    await user_client.start(); await dp.start_polling(bot)
+    logging.info(f"🔍 MATCH_REPORT_CHAT={MATCH_REPORT_CHAT}")
+
+    # Загружаем кэш заявок из Airtable при старте
+    if _AIRTABLE_KEY and _AIRTABLE_BASE:
+        try:
+            _match_requests_cache = await asyncio.to_thread(_get_active_requests)
+            logging.info("Match кэш загружен: %d клиентов, %d с фото",
+                         len(_match_requests_cache),
+                         sum(1 for r in _match_requests_cache if r.get("photo_bytes")))
+            if MATCH_REPORT_CHAT:
+                await bot.send_message(
+                    MATCH_REPORT_CHAT,
+                    f"🟢 Бот запущен\n"
+                    f"🔍 Match активен: {len(_match_requests_cache)} клиентов в базе\n"
+                    f"🖼 С фото: {sum(1 for r in _match_requests_cache if r.get('photo_bytes'))}"
+                )
+        except Exception:
+            logging.exception("Не удалось загрузить кэш клиентов Airtable")
+
+        asyncio.create_task(_match_cache_refresh_loop())
+
+    await user_client.start()
+    await dp.start_polling(bot, allowed_updates=["message", "channel_post"])
 
 if __name__ == "__main__": asyncio.run(main())
