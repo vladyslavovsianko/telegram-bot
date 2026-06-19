@@ -665,7 +665,7 @@ async def restart_logic(message: types.Message, state: FSMContext, real_user_id=
     await state.update_data(media_files=[], editing_mode=False)
     uid = real_user_id if real_user_id else message.from_user.id
     # Убираем ReplyKeyboard (Новые часы) перед показом InlineKeyboard клиентов
-    await message.answer("⏳", reply_markup=types.ReplyKeyboardRemove())
+    await message.answer("⏳")
     if uid in MANAGER_IDS: await show_manager_main_menu(message)
     else: await show_client_menu(message, user_id=uid)
 
