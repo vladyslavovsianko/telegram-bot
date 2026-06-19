@@ -2196,6 +2196,6 @@ async def main():
         asyncio.create_task(_match_cache_refresh_loop())
 
     await user_client.start()
-    await dp.start_polling(bot, allowed_updates=["message", "channel_post"])
+    await dp.start_polling(bot, allowed_updates=["message", "channel_post", "callback_query"])
 
 if __name__ == "__main__": asyncio.run(main())
