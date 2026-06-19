@@ -1008,9 +1008,9 @@ async def process_calc_buttons(callback: types.CallbackQuery, state: FSMContext)
         curr_state = await state.get_state()
         
         if curr_state == Form.entering_table:
-            await state.update_data(table=final_val); await check_edit_or_next(callback.message, state, lambda m: start_calculator(m, state, Form.entering_price, "4️⃣ <b>Введи ЦЕНУ (EUR):</b>", allow_skip=False))
+            await state.update_data(table=final_val); await check_edit_or_next(callback.message, state, lambda m: start_calculator(m, state, Form.entering_price, "4️⃣ <b>Введи ЦЕНУ (EUR):</b>", allow_skip=True))
         elif curr_state == Form.entering_price:
-            await state.update_data(price=final_val); await check_edit_or_next(callback.message, state, lambda m: start_calculator(m, state, Form.entering_chrono_price, "5️⃣ <b>Цена CHRONO24:</b>", allow_skip=False))
+            await state.update_data(price=final_val); await check_edit_or_next(callback.message, state, lambda m: start_calculator(m, state, Form.entering_chrono_price, "5️⃣ <b>Цена CHRONO24:</b>", allow_skip=True))
         elif curr_state == Form.entering_chrono_price:
             await state.update_data(chrono_price=final_val); await check_edit_or_next(callback.message, state, show_negotiation_menu)
         elif curr_state == Form.manual_year:
