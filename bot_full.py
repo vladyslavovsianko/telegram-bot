@@ -370,17 +370,6 @@ async def handle_channel_photo(message: types.Message) -> None:
         await _run_match_pipeline([buf.getvalue()], send_report, link)
 
 
-async def _match_cache_refresh_loop() -> None:
-    global _match_requests_cache
-    while True:
-        await asyncio.sleep(_CACHE_REFRESH)
-        try:
-            fresh = await asyncio.to_thread(_get_active_requests)
-            _match_requests_cache = fresh
-            logging.info("Match кэш обновлён: %d клиентов, %d с фото",
-                         len(fresh), sum(1 for r in fresh if r.get("photo_bytes")))
-        except Exception:
-            logging.exception("Не удалось обновить кэш клиентов")
 
 
 
@@ -2315,8 +2304,6 @@ async def main():
                 )
         except Exception:
             logging.exception("Не удалось загрузить кэш клиентов Airtable")
-
-        asyncio.create_task(_match_cache_refresh_loop())
 
     await user_client.start()
     await dp.start_polling(bot, allowed_updates=["message", "channel_post", "callback_query"])
