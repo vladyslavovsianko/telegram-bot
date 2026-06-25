@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 
 # .env используется только как резервный источник если БД недоступна
 load_dotenv()
-load_dotenv(os.path.join(os.path.dirname(__file__), 'match', '.env'), override=False)
+load_dotenv(os.path.join(os.path.dirname(__file__), 'match', '.env'), override=True)
 
 DB_FILE = 'bot_database.db'
 
